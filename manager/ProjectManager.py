@@ -20,7 +20,7 @@ class ProjectManager:
 
         TopBar()
 
-        Game.Run(True)
+        Game.Run(False)
 
 class TopBar(GameObj):
     def __init__(self):
@@ -84,13 +84,75 @@ class btn:
         pygame.draw.rect(self.sub.screen, self.border, self.rect, self.w)
         self.text.render_to(self.sub.screen)
 
+class TextInput(GameObj):
+    def __init__(self, x, y, w, h, font, text="", sub=None):
+        super().__init__(Vector2D(x, y), 3)
+        self.size = Vector2D(w, h)
+        s = Game.screen
+        if sub: s = sub.screen
+        self.sub = SubScreen(x, y, w, h, Assets.colors["bg"], s, sub)
+        self.rect = pygame.Rect((0, 0), self.size.to_int())
+        self.w = 2
+        self.text = Text(font, text, "white", Vector2D(self.rect.centerx, self.rect.centery), "center", 5, visible=False)
+        self.active = False
+        self.hovered = False
+
+        self.buffer = 0
+
+        self.child(self.text)
+
+    def update(self):
+        self.buffer -= 1
+        if self.buffer < 0: self.buffer = 0
+        mpos = self.sub.local_mouse_pos().to_int()
+        self.hovered = self.rect.collidepoint(mpos)
+        if not self.active:
+            if self.hovered: self.w = 5
+            else: self.w = 2
+
+        if Game.click:
+            if not self.hovered:
+                Game.click = False
+                self.active = False
+            else:
+                Game.click = False
+                self.active = True
+
+        if self.active:
+            if Keys.is_pressed(Keys.enter) or Keys.is_pressed(Keys.escape):
+                self.active = False
+                self.w = 2
+
+            text = self.text.text
+            done = False
+            for event in Game.events:
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_BACKSPACE: continue #text = text[:-1]
+                    elif event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE: continue
+                    else: text += event.unicode
+            if Keys.is_held(Keys.backspace) and self.buffer == 0: 
+                text = text[:-1]
+                self.buffer = 15
+            elif not Keys.is_held(Keys.backspace): self.buffer = 0
+            if text != self.text.text: self.text.set_text(text)
+
+    def render(self):
+        self.sub.clear()
+        pygame.draw.rect(self.sub.screen, Assets.colors["btn_around"], self.rect, self.w)
+        self.text.render_to(self.sub.screen)
+        self.sub.render()
+
 class CreatMenue(GameObj):
     def __init__(self):
         self.size = Vector2D(500, 400)
         super().__init__(Vector2D(Game.width/2-self.size.x/2, Game.height/2-self.size.y/2), 3)
         self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Assets.colors["pannel"], Game.screen)
         self.text = Text(Assets.get_font("default-35"), "Create New Project", "white", Vector2D(self.size.x/2, 20), "center", 5, visible=False)
-        self.nameText = Text(Assets.get_font("default-23"), "Name", "white", Vector2D(self.size.x/2, 50), "center", 5, visible=False)
+
+        self.nameText = Text(Assets.get_font("default-35"), "Name:", "white", Vector2D(5, 60), "topleft", 5, visible=False)
+
+        self.nameInput = TextInput(5, 100, self.size.x-10, 50, Assets.get_font("default-23"), sub=self.sub)
+
         self.rect = pygame.Rect((0, 0), self.size.to_int())
 
         #btns
@@ -120,6 +182,7 @@ class CreatMenue(GameObj):
         self.text.render_to(self.sub.screen)
 
         self.nameText.render_to(self.sub.screen)
+        self.nameInput.render()
 
         pygame.draw.line(self.sub.screen, Assets.colors["btn_around"], (10, self.size.y-90), (self.size.x-10, self.size.y-90), 2)
         self.create.render()
