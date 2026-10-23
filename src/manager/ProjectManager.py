@@ -1,9 +1,9 @@
 from PyScene import *
 import os
 import pygame
-import json
 import sys
 from importlib.metadata import version
+from ..utils.files import gen_project_lists, get_save_dir_path
 
 
 class ProjectManager:
@@ -15,8 +15,7 @@ class ProjectManager:
         Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["pannel"], -6)
         Rect(10, 90, Game.width-110,  Game.height-130, Assets.colors["sub"], -5)
 
-        with open("data/projects.json", "r") as f:
-            self.prjData = json.load(f)
+        Game.projects = gen_project_lists() #name: path
 
         TopBar()
 
@@ -152,6 +151,7 @@ class CreatMenue(GameObj):
         self.nameText = Text(Assets.get_font("default-35"), "Name:", "white", Vector2D(5, 60), "topleft", 5, visible=False)
 
         self.nameInput = TextInput(5, 100, self.size.x-10, 50, Assets.get_font("default-23"), sub=self.sub)
+        self.input_active = False
 
         self.rect = pygame.Rect((0, 0), self.size.to_int())
 
@@ -165,7 +165,8 @@ class CreatMenue(GameObj):
         self.child(self.text)
         self.child(self.nameText)    
         self.child(self.create.text)
-        self.child(self.cancel.text) #to destroy text when create 'win' closes    
+        self.child(self.cancel.text) #to destroy text when create 'win' closes   
+        self.child(self.nameInput) 
 
     def update(self):
         self.create.update()
@@ -174,6 +175,34 @@ class CreatMenue(GameObj):
         if self.cancel.pressed:
             self.destroy()
             self.DONE = True
+            return
+
+        if self.create.pressed and len(self.nameInput.text.text) > 0:
+            self.nameInput.text.set_text(self.check_name())
+            if self.nameInput.text.text in Game.projects.keys(): return
+            self.DONE = True
+            self.destroy()
+            self.gen()
+            return
+
+        if self.input_active and not self.nameInput.active:
+            self.nameInput.text.set_text(self.check_name())
+        self.input_active = self.nameInput.active
+
+    def gen(self):
+        name = self.nameInput.text.text
+        path = get_save_dir_path()+"/"+name
+        #gen project
+        Game.projects[name] = path
+        #gen folder
+        os.makedirs(path)
+
+    def check_name(self):
+        text = self.nameInput.text.text
+        #make the text folder safe
+        for char in ["\\", "/", ":", "*", "?", "\"", "<", ">", "|", ".", " ", "#", "%", "$", "&", "@", "!", "^"]:
+            text = text.replace(char, "_")
+        return text
 
     def render(self):
         self.sub.clear()

@@ -1,8 +1,9 @@
 from PyScene import *
 import os
 import pygame
-from manager.ProjectManager import ProjectManager
-from utils.load_assets import load_manager_assets
+from src.manager.ProjectManager import ProjectManager
+from src.utils.load_assets import load_manager_assets
+from src.utils.files import init_save_dir
 
 #file for launching the project manager and some basic init stuff
 width, height = 1024, 600
@@ -14,7 +15,15 @@ Assets.colors = {}
 
 print("PyScene loaded successfully\n")
 load_manager_assets()
-print("[Studio] - Manager Assets Loaded")
+print("[Studio] - Manager Assets Loaded\n")
+
+print("[Files] - Checking save directory\n")
+
+if init_save_dir():
+    print("[Files] - Save directory created")
+else:
+    print("[Files] - Save directory already exists")
 
 
 ProjectManager()
+
