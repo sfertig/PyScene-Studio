@@ -2,8 +2,10 @@ from PyScene import *
 import os
 import pygame
 import shutil
+import json
 from importlib.metadata import version
-from ..utils.files import gen_project_lists, get_save_dir_path
+from ..utils.files import *
+from ..Build import Build
 
 
 class ProjectManager:
@@ -192,7 +194,7 @@ class CreateMenue(GameObj):
             self.DONE = True
             return
 
-        if self.create.pressed and len(self.nameInput.text.text) > 0:
+        if (self.create.pressed or (Keys.is_pressed(Keys.enter) and not self.nameInput.active)) and len(self.nameInput.text.text) > 0:
             self.nameInput.text.set_text(self.check_name())
             if self.nameInput.text.text in Game.projects.keys(): return
             self.DONE = True
@@ -212,6 +214,29 @@ class CreateMenue(GameObj):
         Game.projects[name] = path
         #gen folder
         os.makedirs(path)
+        #create project file
+        data = DEFAULTPROJECT.copy()
+        data["project_name"] = name
+        data["engine_version"] = Game.version
+        data["window"]["title"] = f"{name} | PyScene Studio"
+        with open(path+"/project.json", "w") as f:
+            json.dump(data, f, indent=4)
+
+        #gen python folders / files
+        os.makedirs(path+"/_python")
+        with open(path+"/_python/_main.py", "w") as f:
+            f.write("")
+        os.mkdir(path+"/_python/data")
+        #create engine folders
+        os.makedirs(path+"/scenes")
+        data = DEFAULTSCENE.copy()
+        data["name"] = "main"
+        with open(path+"/scenes/main.json", "w") as f:
+            json.dump(data, f, indent=4)
+        os.makedirs(path+"/objects")
+
+        #create assets folder
+        os.makedirs(path+"/assets")
 
     def check_name(self):
         text = self.nameInput.text.text
@@ -368,9 +393,11 @@ class Options(GameObj):
         elif self.btns["del"].pressed:
             #del the project and then reload
             Game.RELOAD = True
-            os.rmdir(self.path)
+            shutil.rmtree(self.path)
             self.destroy()
             print("[Options] - Project deleted: "+self.name)
+        elif self.btns["run"].pressed:
+            Build(self.name) #step 1, build
 
     def render(self):
         self.sub.clear()
