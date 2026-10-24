@@ -1,7 +1,7 @@
 from PyScene import *
 import os
 import pygame
-import sys
+import shutil
 from importlib.metadata import version
 from ..utils.files import gen_project_lists, get_save_dir_path
 
@@ -13,6 +13,7 @@ class ProjectManager:
         Text(Assets.get_font("default-35"), "PyScene-Studio", "white", Vector2D(5, 5), "topleft", 5)
         Text(Assets.get_font("default-23"), f"GUI Version: {Game.version} | PyScene Version: {version("PyScene")}", "white", Vector2D(5, Game.height-20), "topleft", 5)
         Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["pannel"], -6)
+        Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["btn_around"], 10, 2)
 
         Game.projects = gen_project_lists() #name: path
         Game.RELOAD = False
@@ -36,7 +37,6 @@ class TopBar(GameObj):
         }
 
     def update(self):
-        Game.RELOAD = False
         if self.create is None:
             for btn in self.btns.values():
                 btn.update()
@@ -163,6 +163,9 @@ class CreateMenue(GameObj):
         self.nameText = Text(Assets.get_font("default-35"), "Name:", "white", Vector2D(5, 60), "topleft", 5, visible=False)
 
         self.nameInput = TextInput(5, 100, self.size.x-10, 50, Assets.get_font("default-23"), sub=self.sub)
+        self.nameInput.hovered = True
+        self.nameInput.active = True
+        self.nameInput.w = 5
         self.input_active = False
 
         self.rect = pygame.Rect((0, 0), self.size.to_int())
@@ -232,12 +235,12 @@ class CreateMenue(GameObj):
 
         self.sub.render()
 
-
 class ProjectList(GameObj):
     def __init__(self):
         super().__init__(Vector2D(10, 90))
-        self.size = Vector2D(Game.width-110,  Game.height-130)
+        self.size = Vector2D(Game.width-160,  Game.height-130)
         self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Assets.colors["sub"], Game.screen)
+        self.rect = pygame.Rect((0, 0), self.size.to_int())
 
         self.gen()
 
@@ -258,28 +261,46 @@ class ProjectList(GameObj):
             self.gen()
             Game.RELOAD = False
 
+        change = 0
+        for event in Game.events:
+            if event.type == pygame.MOUSEWHEEL: change = event.y*2
+        if Keys.is_held(Keys.down): change = 1
+        elif Keys.is_held(Keys.up): change = -1
+        change*=5
+        if change != 0:
+            for project in self.projects:
+                project.scroll(change)
+
     def render(self):
         self.sub.clear()
         for project in self.projects:
             project.render()
+        pygame.draw.rect(self.sub.screen, Assets.colors["btn_around"], self.rect, 2)
         self.sub.render()
-
 
 class Project(GameObj):
     def __init__(self, y, name, path, sub):
         super().__init__(Vector2D(10, y), visible=False)
-        self.rect = pygame.Rect((0, 0), (Game.width-130, 50))
+        self.rect = pygame.Rect((0, 0), (Game.width-180, 50))
         self.parentSub = sub
         self.sub = SubScreen(self.pos.x, self.pos.y, self.rect.width, self.rect.height, Assets.colors["pannel"], sub.screen, sub)
         self.subRect = pygame.Rect(self.pos.to_int(), self.rect.size)
 
         self.name = Text(Assets.get_font("default-23"), name, "white", Vector2D(5, self.rect.centery), "midleft", 5, visible=False)
         self.child(self.name)
+        self._name = name
         self.path = path
 
         self.hovered = False
         self.active = False
         self.w = 2
+
+        self.options = None
+
+    def scroll(self, amount):
+        self.pos.y+=amount
+        self.sub.pos.y+=amount
+        self.subRect.y = self.pos.y
 
     def update(self):
         mpos = self.parentSub.local_mouse_pos().to_int()
@@ -288,11 +309,20 @@ class Project(GameObj):
             if self.hovered: self.w = 5
             else: self.w = 2
 
-        if Game.click:
+        if Game.click and self.parentSub.screen.get_rect().collidepoint(mpos):
             if not self.hovered:
                 self.active = False
+                if self.options: self.options.destroy()
+                self.options = None
             else:
                 self.active = True
+                self.options = Options(self._name, self.path)
+
+
+        if Keys.is_pressed(Keys.escape) and self.active:
+            self.active = False
+            if self.options: self.options.destroy()
+            self.options = None
 
 
     def render(self):
@@ -303,5 +333,54 @@ class Project(GameObj):
 
         self.sub.render()
 
+class Options(GameObj):
+    def __init__(self, name, path):
+        super().__init__(Vector2D(Game.width-140, 90), 5)
+        self.size = Vector2D(120, Game.height-130)
+        self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Assets.colors["pannel"], Game.screen)
 
+        self.text = Text(Assets.get_font("default-23"), "Options", "white", Vector2D(self.size.x/2, 12), "center", 5, visible=False)
+        self.child(self.text)
+
+        self.name = name
+        self.path = path
+
+        #btns
+        self.btns: dict[str, btn] = {
+            "edit": btn(10, 30, self.size.x-20, 30, "Edit", self.sub),
+            "run": btn(10, 70, self.size.x-20, 30, "Run", self.sub),
+            "rename": btn(10, 110, self.size.x-20, 30, "Rename", self.sub),
+            "dupe": btn(10, 150, self.size.x-20, 30, "Duplicate", self.sub),
+            "del": btn(10, 220, self.size.x-20, 30, "Delete", self.sub),
+        }
+
+    def update(self):
+        for btn in self.btns.values():
+            btn.update()
+
+        #btn acctions
+        if self.btns["dupe"].pressed:
+            #copy the project and add _copt to name
+            shutil.copytree(self.path, self.path+"_copy")
+            print("[Options] - Project duplicated: "+self.name)
+            self.destroy()
+            Game.RELOAD = True
+        elif self.btns["del"].pressed:
+            #del the project and then reload
+            Game.RELOAD = True
+            os.rmdir(self.path)
+            self.destroy()
+            print("[Options] - Project deleted: "+self.name)
+
+    def render(self):
+        self.sub.clear()
+        pygame.draw.line(self.sub.screen, Assets.colors["btn_around"], (5, 2), (self.size.x-5, 2))
+        self.text.render_to(self.sub.screen)
+        pygame.draw.line(self.sub.screen, Assets.colors["btn_around"], (5, 20), (self.size.x-5, 20))
+        pygame.draw.line(self.sub.screen, Assets.colors["btn_around"], (5, 210), (self.size.x-5, 210))
+
+        for btn in self.btns.values():
+            btn.render()
+
+        self.sub.render()
 

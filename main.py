@@ -9,7 +9,7 @@ from src.utils.files import init_save_dir
 width, height = 1024, 600
 Game.init(width, height, "PyScene-Studio Project Manager", "black", 60, False, False)
 
-Game.version = "0.0.1"
+Game.version = "0.1.0"
 
 Assets.colors = {}
 
@@ -19,7 +19,7 @@ print("[Studio] - Manager Assets Loaded\n")
 
 print("[Files] - Checking save directory\n")
 
-if init_save_dir():
+if not init_save_dir():
     print("[Files] - Save directory created")
 else:
     print("[Files] - Save directory already exists")
