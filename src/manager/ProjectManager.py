@@ -13,11 +13,12 @@ class ProjectManager:
         Text(Assets.get_font("default-35"), "PyScene-Studio", "white", Vector2D(5, 5), "topleft", 5)
         Text(Assets.get_font("default-23"), f"GUI Version: {Game.version} | PyScene Version: {version("PyScene")}", "white", Vector2D(5, Game.height-20), "topleft", 5)
         Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["pannel"], -6)
-        Rect(10, 90, Game.width-110,  Game.height-130, Assets.colors["sub"], -5)
 
         Game.projects = gen_project_lists() #name: path
+        Game.RELOAD = False
 
         TopBar()
+        ProjectList()
 
         Game.Run(False)
 
@@ -28,25 +29,35 @@ class TopBar(GameObj):
 
         self.create = None
 
-        self.btns: list[btn] = [
-            btn(5, 5, 75, 40, "+ Create", self.sub),
-            btn(90, 5, 75, 40, "Rescan", self.sub),
-            btn(175, 5, 75, 40, "Import", self.sub),
-        ]
+        self.btns: dict[str, btn] = {
+            "create": btn(5, 5, 75, 40, "+ Create", self.sub),
+            "rescan": btn(90, 5, 75, 40, "Rescan", self.sub),
+            "import": btn(175, 5, 75, 40, "Import", self.sub),
+        }
 
     def update(self):
+        Game.RELOAD = False
         if self.create is None:
-            for btn in self.btns:
+            for btn in self.btns.values():
                 btn.update()
-                if btn.pressed: 
-                    self.create = CreatMenue()
-                    btn.pressed = False
         elif self.create.DONE:
             self.create = None
+            Game.RELOAD = True
+
+        if self.btns["create"].pressed and not self.create: 
+            self.btns["create"].pressed = False
+            self.create = CreateMenue()
+            Game.RELOAD = True
+        elif self.btns["rescan"].pressed: 
+            Game.RELOAD = True
+            print("[TopBar] - Rescanning projects...")
+
+        if Game.RELOAD:
+            Game.projects = gen_project_lists()
 
     def render(self):
         self.sub.clear()
-        for btn in self.btns:
+        for btn in self.btns.values():
             btn.render()
         self.sub.render()
 
@@ -84,7 +95,7 @@ class btn:
         self.text.render_to(self.sub.screen)
 
 class TextInput(GameObj):
-    def __init__(self, x, y, w, h, font, text="", sub=None):
+    def __init__(self, x, y, w, h, font, text="", sub=None, _input=True):
         super().__init__(Vector2D(x, y), 3)
         self.size = Vector2D(w, h)
         s = Game.screen
@@ -97,6 +108,7 @@ class TextInput(GameObj):
         self.hovered = False
 
         self.buffer = 0
+        self._input = _input
 
         self.child(self.text)
 
@@ -121,19 +133,19 @@ class TextInput(GameObj):
             if Keys.is_pressed(Keys.enter) or Keys.is_pressed(Keys.escape):
                 self.active = False
                 self.w = 2
-
-            text = self.text.text
-            done = False
-            for event in Game.events:
-                if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_BACKSPACE: continue #text = text[:-1]
-                    elif event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE: continue
-                    else: text += event.unicode
-            if Keys.is_held(Keys.backspace) and self.buffer == 0: 
-                text = text[:-1]
-                self.buffer = 15
-            elif not Keys.is_held(Keys.backspace): self.buffer = 0
-            if text != self.text.text: self.text.set_text(text)
+            if self._input:
+                text = self.text.text
+                done = False
+                for event in Game.events:
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_BACKSPACE: continue #text = text[:-1]
+                        elif event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE: continue
+                        else: text += event.unicode
+                if Keys.is_held(Keys.backspace) and self.buffer == 0: 
+                    text = text[:-1]
+                    self.buffer = 15
+                elif not Keys.is_held(Keys.backspace): self.buffer = 0
+                if text != self.text.text: self.text.set_text(text)
 
     def render(self):
         self.sub.clear()
@@ -141,10 +153,10 @@ class TextInput(GameObj):
         self.text.render_to(self.sub.screen)
         self.sub.render()
 
-class CreatMenue(GameObj):
+class CreateMenue(GameObj):
     def __init__(self):
         self.size = Vector2D(500, 400)
-        super().__init__(Vector2D(Game.width/2-self.size.x/2, Game.height/2-self.size.y/2), 3)
+        super().__init__(Vector2D(Game.width/2-self.size.x/2, Game.height/2-self.size.y/2), 100)
         self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Assets.colors["pannel"], Game.screen)
         self.text = Text(Assets.get_font("default-35"), "Create New Project", "white", Vector2D(self.size.x/2, 20), "center", 5, visible=False)
 
@@ -191,6 +203,7 @@ class CreatMenue(GameObj):
 
     def gen(self):
         name = self.nameInput.text.text
+        print("[Create] - Generating project: "+name)
         path = get_save_dir_path()+"/"+name
         #gen project
         Game.projects[name] = path
@@ -218,5 +231,77 @@ class CreatMenue(GameObj):
         self.cancel.render()
 
         self.sub.render()
+
+
+class ProjectList(GameObj):
+    def __init__(self):
+        super().__init__(Vector2D(10, 90))
+        self.size = Vector2D(Game.width-110,  Game.height-130)
+        self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Assets.colors["sub"], Game.screen)
+
+        self.gen()
+
+    def gen(self):
+        #projects
+        self.projects: list[Project] = []
+
+        y = 10
+        for key, value in Game.projects.items():
+            self.projects.append(Project(y, key, value, self.sub))
+            y += self.projects[0].rect.height+15
+
+
+    def update(self):
+        if Game.RELOAD:
+            for project in self.projects:
+                project.destroy()
+            self.gen()
+            Game.RELOAD = False
+
+    def render(self):
+        self.sub.clear()
+        for project in self.projects:
+            project.render()
+        self.sub.render()
+
+
+class Project(GameObj):
+    def __init__(self, y, name, path, sub):
+        super().__init__(Vector2D(10, y), visible=False)
+        self.rect = pygame.Rect((0, 0), (Game.width-130, 50))
+        self.parentSub = sub
+        self.sub = SubScreen(self.pos.x, self.pos.y, self.rect.width, self.rect.height, Assets.colors["pannel"], sub.screen, sub)
+        self.subRect = pygame.Rect(self.pos.to_int(), self.rect.size)
+
+        self.name = Text(Assets.get_font("default-23"), name, "white", Vector2D(5, self.rect.centery), "midleft", 5, visible=False)
+        self.child(self.name)
+        self.path = path
+
+        self.hovered = False
+        self.active = False
+        self.w = 2
+
+    def update(self):
+        mpos = self.parentSub.local_mouse_pos().to_int()
+        self.hovered = self.subRect.collidepoint(mpos)
+        if not self.active:
+            if self.hovered: self.w = 5
+            else: self.w = 2
+
+        if Game.click:
+            if not self.hovered:
+                self.active = False
+            else:
+                self.active = True
+
+
+    def render(self):
+        self.sub.clear()
+
+        pygame.draw.rect(self.sub.screen, Assets.colors["btn_around"], self.rect, self.w)
+        self.name.render_to(self.sub.screen)
+
+        self.sub.render()
+
 
 

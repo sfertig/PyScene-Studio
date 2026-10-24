@@ -25,6 +25,5 @@ def gen_project_lists():
     projects = {}
     for folder in folders:
         projects[folder] = path+"/"+folder
-    print(projects)
     return projects
 
