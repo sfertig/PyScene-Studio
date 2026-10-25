@@ -6,6 +6,7 @@ import json
 from importlib.metadata import version
 from ..utils.files import *
 from ..Build import Build
+from ..Runner import Runner
 
 
 class ProjectManager:
@@ -238,6 +239,12 @@ class CreateMenue(GameObj):
         #create assets folder
         os.makedirs(path+"/assets")
 
+        #debug object
+        """data = DEFAULTOBJECT.copy()
+        data["name"] = "debug"
+        with open(path+"/objects/debug.json", "w") as f:
+            json.dump(data, f, indent=4)"""
+
     def check_name(self):
         text = self.nameInput.text.text
         #make the text folder safe
@@ -275,6 +282,7 @@ class ProjectList(GameObj):
 
         y = 10
         for key, value in Game.projects.items():
+            if key[0] == ".": continue
             self.projects.append(Project(y, key, value, self.sub))
             y += self.projects[0].rect.height+15
 
@@ -377,6 +385,7 @@ class Options(GameObj):
             "rename": btn(10, 110, self.size.x-20, 30, "Rename", self.sub),
             "dupe": btn(10, 150, self.size.x-20, 30, "Duplicate", self.sub),
             "del": btn(10, 220, self.size.x-20, 30, "Delete", self.sub),
+            "build": btn(10, self.size.y-60, self.size.x-20, 30, "Build", self.sub),
         }
 
     def update(self):
@@ -398,6 +407,9 @@ class Options(GameObj):
             print("[Options] - Project deleted: "+self.name)
         elif self.btns["run"].pressed:
             Build(self.name) #step 1, build
+            Runner(self.name) #step 2, run
+        elif self.btns["build"].pressed:
+            Build(self.name)
 
     def render(self):
         self.sub.clear()
