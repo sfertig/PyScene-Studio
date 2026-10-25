@@ -1,5 +1,4 @@
 from PyScene import *
-import pygame
 import os
 import json
 
@@ -26,6 +25,7 @@ class Build:
             if file.endswith(".json"):
                 self.gen_object(file[:-5])
                 print("[Build] - Scene File Built: "+file[:-5]) 
+        print("[Build] - Project Built Successfully: "+self.name)
 
     def gen_main(self):
         p = self.path+"/_python/_main.py"
@@ -123,9 +123,9 @@ class Build:
 
 
 
-def exists(path):
+def exists(path, write=""):
     #checks if a file exists, if not create it
     if not os.path.exists(path):
         with open(path, "w") as f:
-            f.write("")
+            f.write(write)
 

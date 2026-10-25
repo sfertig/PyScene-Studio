@@ -3,14 +3,24 @@ import os
 import pygame
 import shutil
 import json
+import time
 from importlib.metadata import version
 from ..utils.files import *
 from ..Build import Build
 from ..Runner import Runner
 
+from ..editor.Run import RunEditor
+from src.utils.load_assets import load_manager_assets
+
+
 
 class ProjectManager:
     def __init__(self):
+        width, height = 1024, 600
+        Game.init(width, height, "PyScene-Studio Project Manager", "black", 60, False, True)
+        pygame.font.init()
+        load_manager_assets()
+        
         #create objs
         Game.bg = Assets.colors["bg"]
         Text(Assets.get_font("default-35"), "PyScene-Studio", "white", Vector2D(5, 5), "topleft", 5)
@@ -410,6 +420,12 @@ class Options(GameObj):
             Runner(self.name) #step 2, run
         elif self.btns["build"].pressed:
             Build(self.name)
+        elif self.btns["edit"].pressed:
+            Game.quit(False) #dont close python process
+            Assets.colors = {}
+            time.sleep(0.3)
+            RunEditor(self.name)
+            
 
     def render(self):
         self.sub.clear()
