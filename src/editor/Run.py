@@ -8,6 +8,8 @@ from importlib.metadata import version
 from ..utils.load_assets import Colors, load_editor_assets
 from ..utils.files import *
 
+from .Tabs import TabMenue
+
 BREAK = False
 
 def RunEditor(project_name):
@@ -16,9 +18,11 @@ def RunEditor(project_name):
     pygame.font.init()
     load_editor_assets()
 
+    Game.project = project_name
     Game.always_global = True
 
     WINDOW_HEAD(project_name)
+    TabMenue(40)
 
     while True:
         Game.Tick()
@@ -28,7 +32,7 @@ def RunEditor(project_name):
     Game._project_manager()
     
 
-class WINDOW_HEAD(GameObj): #window head for quick options
+class WINDOW_HEAD(GameObj): #window head for quick options (and bottom versions bar)
     def __init__(self, project_name):
         super().__init__(Vector2D(0, 0), 100)
         self.size = Vector2D(Game.width, 40)
