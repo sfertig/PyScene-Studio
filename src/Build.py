@@ -24,7 +24,7 @@ class Build:
         for file in os.listdir(self.path+"/objects/"):
             if file.endswith(".json"):
                 self.gen_object(file[:-5])
-                print("[Build] - Scene File Built: "+file[:-5]) 
+                print("[Build] - Object File Built: "+file[:-5]) 
         print("[Build] - Project Built Successfully: "+self.name)
 
     def gen_main(self):

@@ -25,14 +25,17 @@ class TabMenue(GameObj):
         self.tabs.clear()
         self.tabs.append(Tab(10, "Settings", self.sub, self.r))
         self.tabs.append(Tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, "Assets", self.sub, self.r))
-        self.tabs.append(Tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, "Create", self.sub, self.rect))
-        self.LPos = (self.tabs[-1].pos.x+self.tabs[-1].size.x+5, 5)
-        self.tabs.append(SceneTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+10, "main", self.sub, self.r)) #main scene
+        self.tabs.append(TabManager_tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, self.sub, self.r))
+        self.LPos = (self.tabs[-1].pos.x+self.tabs[-1].size.x+2.5, 5)
+        self.tabs.append(SceneTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, "main", self.sub, self.r)) #main scene
         self.tabs[-1].active = True #auto load main scene
 
     def update(self):
+        active = False
         for t in self.tabs:
             t.update_tab()
+            if t.active: active = True
+        if not active: self.tabs[2].active = True #Tab Manager
 
         mpos = self.sub.local_mouse_pos().to_int()
         self.hovered = self.btn_rect.collidepoint(mpos)
@@ -44,15 +47,22 @@ class TabMenue(GameObj):
 
     def remove_active(self):
         index = 0
-        for t in self.tabs:
-            if t.name in ["Settings", "Assets", "Create"]: continue
+        for t in self.tabs[3:]:
             if t.active: index = self.tabs.index(t)
         if index == 0: return
-        width = self.tabs[index].pos.x - self.tabs[index-1].pos.x
+        self.tabs[index].close()
+        self.tabs[index].on_close()
         self.tabs.remove(self.tabs[index])
-        #move tabs to the left -10
+        #move tabs to the left
+        tabs: list[Tab] = []
         for t in self.tabs[index:]:
-            t.move(-width)
+            tabs.append(t)
+            self.tabs.remove(t)
+        if len(tabs) > 0: tabs[0].active = True
+        else: self.tabs[-1].active = True #Tab Manager
+        for t in tabs:
+            t.move(self.tabs[-1].pos.x+self.tabs[-1].size.x+5)
+            self.tabs.append(t)
 
 
     def render(self):
@@ -67,7 +77,7 @@ class TabMenue(GameObj):
 
         self.sub.render()
 
-
+#region Tab
 class Tab:
     def __init__(self, x, name, sub, rect):
         self.pos = Vector2D(x, 5)
@@ -85,11 +95,18 @@ class Tab:
         self.w = -1
         self.active = False
 
+    #functions all tabs will later have
+    def on_change(self): pass
+    def on_close(self): pass
+    def update(self): pass
+    def render(self): pass
+
     def move(self, amount):
-        self.pos.x += amount
-        self.sub.pos.x += amount
+        self.pos.x = amount
+        self.sub.pos.x = amount
     
     def update_tab(self):
+        self.update()
         mpos = self.sub.local_mouse_pos().to_int()
         _mpos = self.P_Sub.local_mouse_pos().to_int()
         self.hovered = self.rect.collidepoint(mpos)
@@ -100,10 +117,13 @@ class Tab:
         if Game.click and self._rect.collidepoint(_mpos):
             if not self.active and self.hovered:
                 self.active = True
+                self.on_change()
             elif self.active and not self.hovered:
                 self.active = False
+                self.on_close()
 
     def render_tab(self):
+        self.render()
         self.sub.clear()
         pygame.draw.rect(self.screen, Colors["b"], self.rect, self.w)
         self.text.render_to(self.screen)
@@ -115,27 +135,28 @@ class Tab:
     def destroy(self):
         self.text.destroy()
 
+#endregion
+
 #region Tab Types
+
+#Tab Manager
+class TabManager_tab(Tab):
+    def __init__(self, x, sub, rect):
+        super().__init__(x, "Tab Manager", sub, rect)
+
+
 
 #Scene Tab
 class SceneTab(Tab):
     def __init__(self, x, scene_name, sub, rect):
         super().__init__(x, scene_name+" Scene", sub, rect)
 
-    def update(self):
-        pass
-
-    def render(self):
-        pass
 
 #Object Tab
 class ObjTab(Tab):
     def __init__(self, x, obj_name, sub, rect):
         super().__init__(x, obj_name + " Object", sub, rect)
 
-    def update(self):
-        pass
 
-    def render(self):
-        pass
+#endregion
 
