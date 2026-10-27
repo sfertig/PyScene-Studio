@@ -23,11 +23,15 @@ def RunEditor(project_name):
     Game.BREAK = False
     Game.click = False
 
+    Game._usableEdit = pygame.Rect(0, 100, Game.width, Game.height-140)
+
     WINDOW_HEAD(project_name)
     TabMenue(40)
     while True:
         Game.Tick()
+        if Keys.is_held(Keys.shift) and Keys.is_pressed(Keys.escape): Game.quit() #debug / developement exit
         if Keys.is_pressed(Keys.escape) or Game.BREAK: break
+
     Game.quit(False)
     print("[Editor] - Editor Closed")
     time.sleep(0.3)

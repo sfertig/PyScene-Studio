@@ -5,6 +5,8 @@ import json
 from ..utils.load_assets import Colors
 from ..utils.files import *
 
+from .edits import *
+
 class TabMenue(GameObj):
     def __init__(self, y):
         super().__init__(Vector2D(0, y), 50)
@@ -21,21 +23,35 @@ class TabMenue(GameObj):
         self.hovered = False
         self.w = 2
 
+    def new_scene(self, name):
+        for tab in self.tabs:
+            if tab.active: 
+                tab.active = False
+                tab.on_non_active()
+        self.tabs.append(SceneTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, name, self.sub, self.r))
+        self.tabs[-1].active = True
+        self.tabs[-1].on_active()
+
     def gen(self):
         self.tabs.clear()
         self.tabs.append(Tab(10, "Settings", self.sub, self.r))
         self.tabs.append(Tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, "Assets", self.sub, self.r))
-        self.tabs.append(TabManager_tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, self.sub, self.r))
+        self.tabs.append(TabManager_tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, self.sub, self.r, self))
         self.LPos = (self.tabs[-1].pos.x+self.tabs[-1].size.x+2.5, 5)
         self.tabs.append(SceneTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, "main", self.sub, self.r)) #main scene
-        self.tabs[-1].active = True #auto load main scene
+        #self.tabs[-1].active = True #auto load main scene
+        #self.tabs[-1].on_active() commented out for debug and working on tab manager rn
+        self.tabs[2].active = True
+        self.tabs[2].on_active()
 
     def update(self):
         active = False
         for t in self.tabs:
             t.update_tab()
             if t.active: active = True
-        if not active: self.tabs[2].active = True #Tab Manager
+        if not active: 
+            self.tabs[2].active = True #Tab Manager
+            self.tabs[2].on_active()
 
         mpos = self.sub.local_mouse_pos().to_int()
         self.hovered = self.btn_rect.collidepoint(mpos)
@@ -59,7 +75,9 @@ class TabMenue(GameObj):
             tabs.append(t)
             self.tabs.remove(t)
         if len(tabs) > 0: tabs[0].active = True
-        else: self.tabs[-1].active = True #Tab Manager
+        else: 
+            self.tabs[-1].active = True #Tab Manager
+            self.tabs[-1].on_active()
         for t in tabs:
             t.move(self.tabs[-1].pos.x+self.tabs[-1].size.x+5)
             self.tabs.append(t)
@@ -96,7 +114,8 @@ class Tab:
         self.active = False
 
     #functions all tabs will later have
-    def on_change(self): pass
+    def on_active(self): pass
+    def on_non_active(self): pass
     def on_close(self): pass
     def update(self): pass
     def render(self): pass
@@ -106,7 +125,6 @@ class Tab:
         self.sub.pos.x = amount
     
     def update_tab(self):
-        self.update()
         mpos = self.sub.local_mouse_pos().to_int()
         _mpos = self.P_Sub.local_mouse_pos().to_int()
         self.hovered = self.rect.collidepoint(mpos)
@@ -117,10 +135,12 @@ class Tab:
         if Game.click and self._rect.collidepoint(_mpos):
             if not self.active and self.hovered:
                 self.active = True
-                self.on_change()
+                self.on_active()
             elif self.active and not self.hovered:
                 self.active = False
-                self.on_close()
+                self.on_non_active()
+
+        self.update()
 
     def render_tab(self):
         self.render()
@@ -141,9 +161,23 @@ class Tab:
 
 #Tab Manager
 class TabManager_tab(Tab):
-    def __init__(self, x, sub, rect):
+    def __init__(self, x, sub, rect, tabs):
         super().__init__(x, "Tab Manager", sub, rect)
+        self.obj = TabManagerEdit(tabs)
+        self.obj.active = False
+        self.obj.visible = False
 
+    def on_active(self):
+        self.obj.visible = True
+        self.obj._active = True
+
+    def on_non_active(self):
+        self.obj.visible = False
+        self.obj._active = False
+
+    def on_close(self):
+        if self.obj: self.obj.destroy()
+        self.obj = None
 
 
 #Scene Tab
