@@ -28,7 +28,7 @@ class Build:
         print("[Build] - Project Built Successfully: "+self.name)
 
     def gen_main(self):
-        p = self.path+"/_python/_main.py"
+        p = self.path+"/_python/main.py"
         i = self.project["window"]
         #generates the code in the _main.py file
         exists(p)

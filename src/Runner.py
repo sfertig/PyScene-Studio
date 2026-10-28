@@ -11,7 +11,7 @@ def get_python_command():
     return None
 
 def Runner(project_name):
-    path = get_save_dir_path() + "/" + project_name + "/_python/_main.py"
+    path = get_save_dir_path() + "/" + project_name + "/_python/main.py"
     
     python_cmd = get_python_command()
     
