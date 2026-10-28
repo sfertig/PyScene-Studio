@@ -23,12 +23,22 @@ class TabMenue(GameObj):
         self.hovered = False
         self.w = 2
 
-    def new_scene(self, name):
+    def open_tab(self, name, _type, id): #name, _type_, id(scene / object)
+        #close current tab
         for tab in self.tabs:
             if tab.active: 
                 tab.active = False
                 tab.on_non_active()
-        self.tabs.append(SceneTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, name, self.sub, self.r))
+        #check it its already exists / is open
+        for tab in self.tabs:
+            if hasattr(tab, _type):
+                if tab._name == name: #change to this tab
+                    tab.active = True
+                    tab.on_active()
+                    return
+        print(f"[TabMenue] - Opening new {id} tab: "+name)
+        if id == "scene": self.tabs.append(SceneTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, name, self.sub, self.r))
+        elif id == "object": self.tabs.append(ObjTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, name, self.sub, self.r))
         self.tabs[-1].active = True
         self.tabs[-1].on_active()
 
@@ -150,6 +160,7 @@ class Tab:
         self.sub.render()
 
     def close(self):
+        self.on_close()
         self.destroy()
 
     def destroy(self):
@@ -184,12 +195,18 @@ class TabManager_tab(Tab):
 class SceneTab(Tab):
     def __init__(self, x, scene_name, sub, rect):
         super().__init__(x, scene_name+" Scene", sub, rect)
+        self._name = scene_name
+
+        self._scene_ = True #attribute used for tab manager
 
 
 #Object Tab
 class ObjTab(Tab):
     def __init__(self, x, obj_name, sub, rect):
         super().__init__(x, obj_name + " Object", sub, rect)
+        self._name = obj_name
+
+        self._object_ = True #attribute used for tab manager
 
 
 #endregion
