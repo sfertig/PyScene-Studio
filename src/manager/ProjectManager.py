@@ -206,7 +206,7 @@ class CreateMenue(GameObj):
             return
 
         if (self.create.pressed or (Keys.is_pressed(Keys.enter) and not self.nameInput.active)) and len(self.nameInput.text.text) > 0:
-            self.nameInput.text.set_text(self.check_name())
+            self.nameInput.text.set_text(check_name(self.nameInput.text.text))
             if self.nameInput.text.text in Game.projects.keys(): return
             self.DONE = True
             self.destroy()
@@ -214,7 +214,7 @@ class CreateMenue(GameObj):
             return
 
         if self.input_active and not self.nameInput.active:
-            self.nameInput.text.set_text(self.check_name())
+            self.nameInput.text.set_text(check_name(self.nameInput.text.text))
         self.input_active = self.nameInput.active
 
     def gen(self):
@@ -249,18 +249,11 @@ class CreateMenue(GameObj):
         #create assets folder
         os.makedirs(path+"/assets")
 
-        #debug object
-        """data = DEFAULTOBJECT.copy()
-        data["name"] = "debug"
-        with open(path+"/objects/debug.json", "w") as f:
-            json.dump(data, f, indent=4)"""
-
-    def check_name(self):
-        text = self.nameInput.text.text
-        #make the text folder safe
-        for char in ["\\", "/", ":", "*", "?", "\"", "<", ">", "|", ".", " ", "#", "%", "$", "&", "@", "!", "^"]:
-            text = text.replace(char, "_")
-        return text
+        #load to editor
+        Game.quit(False) #dont close python process
+        Assets.colors = {}
+        time.sleep(0.3)
+        RunEditor(name, True)
 
     def render(self):
         self.sub.clear()

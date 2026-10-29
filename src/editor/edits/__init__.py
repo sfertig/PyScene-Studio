@@ -1,4 +1,5 @@
 from .TabManager import TabManagerEdit
+from .SettingsTab import SettingsTabEdit
 
 
-__all__ = ["TabManagerEdit"]
+__all__ = ["TabManagerEdit", "SettingsTabEdit"]

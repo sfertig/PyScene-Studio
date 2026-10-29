@@ -27,9 +27,16 @@ def gen_project_lists():
         projects[folder] = path+"/"+folder
     return projects
 
+def check_name(text):
+    _text = text
+    #make the text folder safe
+    for char in ["\\", "/", ":", "*", "?", "\"", "<", ">", "|", ".", " ", "#", "%", "$", "&", "@", "!", "^"]:
+        _text = _text.replace(char, "_")
+    return _text
+
 DEFAULTPROJECT = {
   "project_name": "__name__",
-  "engine_version": "1.1.4",
+  "version": "0.0.1",
   "window": {
     "width": 640,
     "height": 360,

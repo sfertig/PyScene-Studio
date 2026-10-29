@@ -237,7 +237,7 @@ class btn():
         pygame.draw.rect(self.sub.screen, self.color, self.rect, self.w)
         self.text.render_to(self.sub.screen)
         #pygame.draw.circle(self.sub.screen, "yellow", self.mpos, 3)
-        #if self._r: pygame.draw.rect(self.sub.screen, self.color, self._r, 2)
+        if self._r: pygame.draw.rect(self.sub.screen, self.color, self._r, 2)
 
 class TextInput(GameObj):
     def __init__(self, x, y, w, h, font, text="", sub=None, _input=True):

@@ -12,7 +12,7 @@ from ..utils.files import *
 
 from .Tabs import TabMenue
 
-def RunEditor(project_name):
+def RunEditor(project_name, new=False):
     print("[Editor] - Running Editor")
     Game.init(1920, 1080, "PyScene-Studio Editor", Colors["bg"], 60, True, True)
     pygame.font.init()
@@ -22,13 +22,18 @@ def RunEditor(project_name):
     Game.always_global = True
     Game.BREAK = False
     Game.click = False
+    Game.RENAMETITLE = False
 
     Game._usableEdit = pygame.Rect(0, 100, Game.width, Game.height-140)
 
-    WINDOW_HEAD(project_name)
-    TabMenue(40)
+    tabs = TabMenue(40, new)
+    w = WINDOW_HEAD(project_name, tabs)
+    w._active = False
+
     while True:
+        Game.RENAMETITLE = False
         Game.Tick()
+        w.update()
         if Keys.is_held(Keys.shift) and Keys.is_pressed(Keys.escape): Game.quit() #debug / developement exit
         if Keys.is_pressed(Keys.escape) or Game.BREAK: break
 
@@ -39,13 +44,14 @@ def RunEditor(project_name):
     
 
 class WINDOW_HEAD(GameObj): #window head for quick options (and bottom versions bar)
-    def __init__(self, project_name):
+    def __init__(self, project_name, tabs):
         super().__init__(Vector2D(0, 0), 100)
         self.size = Vector2D(Game.width, 40)
         self.sub = SubScreen(0, 0, self.size.x, self.size.y, Colors["pannel"], Game.screen)
         self.rect = pygame.Rect((0, 0), self.size.to_int())
         t = f"PyScene-Studio Editor - {project_name}"
         self.title = self.child(Text(Assets.get_font("default-35"), t, "white", Vector2D(10, self.size.y/2), "midleft", visible=False))
+        self.tabs: TabMenue = tabs
 
         #btns
         self.close = btn(Game.width-40, 30, "X", self.sub)
@@ -56,14 +62,22 @@ class WINDOW_HEAD(GameObj): #window head for quick options (and bottom versions 
         self.child(Text(Assets.get_font("default-25"), f"GUI Version: {Game.version} | PyScene Version: {version("PyScene")}", "white", Vector2D(5, r.pos.y+r.rect.height/2), "midleft", 100))
 
     def update(self):
+        if Game.RENAMETITLE:
+            t = f"PyScene-Studio Editor - {Game.project}"
+            self.title.set_text(t)
 
         self.close.update()
         self.build.update()
         self.run.update()
 
-        if self.close.pressed: Game.BREAK = True
-        elif self.build.pressed: Build(Game.project)
-        elif self.run.pressed: 
+        if self.close.pressed: 
+            self.tabs.save()
+            Game.BREAK = True
+        elif self.build.pressed: 
+            self.tabs.save()
+            Build(Game.project)
+        elif self.run.pressed or Keys.is_pressed(Keys.f5): 
+            self.tabs.save()
             Build(Game.project)
             Runner(Game.project)
 

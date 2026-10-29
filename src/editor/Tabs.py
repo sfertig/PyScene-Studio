@@ -8,7 +8,7 @@ from ..utils.files import *
 from .edits import *
 
 class TabMenue(GameObj):
-    def __init__(self, y):
+    def __init__(self, y, new=False):
         super().__init__(Vector2D(0, y), 50)
         self.size = Vector2D(Game.width, 40)
         self.sub = SubScreen(0, y, self.size.x, self.size.y, Colors["pannel"], Game.screen)
@@ -16,12 +16,16 @@ class TabMenue(GameObj):
         self.r = pygame.Rect((0, 0), (self.size.x-110, self.size.y))
         self.tabs: list[Tab] = []
 
-        self.gen()
+        self.gen(new)
 
         self.btn_rect = pygame.Rect(Game.width-110, 5, 100, 30)
         self.closeText = self.child(Text(Assets.get_font("default-35"), "CLOSE", "white", Vector2D(self.btn_rect.centerx, self.btn_rect.centery), visible=False))
         self.hovered = False
         self.w = 2
+
+    def save(self):
+        for tab in self.tabs:
+            tab.save()
 
     def open_tab(self, name, _type, id): #name, _type_, id(scene / object)
         #close current tab
@@ -42,17 +46,19 @@ class TabMenue(GameObj):
         self.tabs[-1].active = True
         self.tabs[-1].on_active()
 
-    def gen(self):
+    def gen(self, new=False):
         self.tabs.clear()
-        self.tabs.append(Tab(10, "Settings", self.sub, self.r))
+        self.tabs.append(Settings_tab(10, self.sub, self.r))
         self.tabs.append(Tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, "Assets", self.sub, self.r))
         self.tabs.append(TabManager_tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, self.sub, self.r, self))
         self.LPos = (self.tabs[-1].pos.x+self.tabs[-1].size.x+2.5, 5)
         self.tabs.append(SceneTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, "main", self.sub, self.r)) #main scene
-        #self.tabs[-1].active = True #auto load main scene
-        #self.tabs[-1].on_active() commented out for debug and working on tab manager rn
-        self.tabs[2].active = True
-        self.tabs[2].on_active()
+        if not new:
+            self.tabs[-1].active = True #auto load main scene
+            self.tabs[-1].on_active() 
+        else: #auto load tab manager on new project open
+            self.tabs[2].active = True
+            self.tabs[2].on_active()
 
     def update(self):
         active = False
@@ -129,6 +135,7 @@ class Tab:
     def on_close(self): pass
     def update(self): pass
     def render(self): pass
+    def save(self): pass
 
     def move(self, amount):
         self.pos.x = amount
@@ -169,6 +176,31 @@ class Tab:
 #endregion
 
 #region Tab Types
+
+#settings
+class Settings_tab(Tab):
+    def __init__(self, x, sub, rect):
+        super().__init__(x, "Settings", sub, rect)
+        self.obj = SettingsTabEdit()
+        self.obj.active = False
+        self.obj.visible = False
+
+    def on_active(self):
+        self.obj.visible = True
+        self.obj._active = True
+
+    def on_non_active(self):
+        self.save()
+        self.obj.visible = False
+        self.obj._active = False
+
+    def on_close(self):
+        self.save()
+        if self.obj: self.obj.destroy()
+        self.obj = None
+
+    def save(self):
+        if self.obj: self.obj.save()
 
 #Tab Manager
 class TabManager_tab(Tab):
