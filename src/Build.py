@@ -61,7 +61,9 @@ class Build:
         #create object and basic functions
 
         #args
-        _args = i["functions"]["__init__"]["args"]
+        dict_args = i["functions"]["__init__"]["args"]
+        _args = []
+        for _i in dict_args: _args.append(_i["name"])
         args = ""
         #turn args into a string
         for _i in _args: args += f"{_i}, "

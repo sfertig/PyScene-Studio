@@ -125,9 +125,6 @@ class PropertiesPannel(GameObj):
         self.attr: list[Attribute] = []
 
         self.gen()
-        print(len(self.attr))
-        for attr in self.attr:
-            print(attr.pos.to_int())
 
     def gen(self):
         self.attr.clear()
@@ -143,7 +140,7 @@ class PropertiesPannel(GameObj):
             args = data["functions"]["__init__"]["args"]
             for i in args:
                 if i["name"] == var:
-                    #print(f"adding property: {var} of type: {i['type']} with value: {self.data['variables'][var]} at y: {y}")
+                    print(f"adding property: {var} of type: {i['type']} with value: {self.data['variables'][var]} at y: {y}")
                     self.attr.append(self.child(Attribute(y, var, i["type"], self.data["variables"][var], self.sub)))
                     break
 
