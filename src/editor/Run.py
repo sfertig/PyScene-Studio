@@ -38,7 +38,7 @@ def RunEditor(project_name, new=False):
         Game.Tick()
         w.update()
         if Keys.is_held(Keys.shift) and Keys.is_pressed(Keys.escape): Game.quit() #debug / developement exit
-        if Keys.is_pressed(Keys.escape) or Game.BREAK: break
+        if Game.BREAK: break
 
     Game.quit(False)
     print("[Editor] - Editor Closed")
@@ -61,7 +61,7 @@ class WINDOW_HEAD(GameObj): #window head for quick options (and bottom versions 
         self.build = btn(Game.width-160, 100, "Build", self.sub)
         self.run = btn(Game.width-270, 100, "Run", self.sub)
 
-        r = self.child(Rect(0, Game.height-30, Game.width, 30, Colors["pannel"], 10))
+        r = self.child(Rect(0, Game.height-30, Game.width, 30, Colors["pannel"], 0, 10))
         self.child(Text(Assets.get_font("default-25"), f"GUI Version: {Game.version} | PyScene Version: {version("PyScene")}", "white", Vector2D(5, r.pos.y+r.rect.height/2), "midleft", 100))
 
     def update(self):

@@ -182,14 +182,16 @@ class Settings_tab(Tab):
     def __init__(self, x, sub, rect):
         super().__init__(x, "Settings", sub, rect)
         self.obj = SettingsTabEdit()
-        self.obj.active = False
+        self.obj._active = False
         self.obj.visible = False
 
     def on_active(self):
+        print("settings active")
         self.obj.visible = True
         self.obj._active = True
 
     def on_non_active(self):
+        print("settings non active")
         self.save()
         self.obj.visible = False
         self.obj._active = False
@@ -207,7 +209,7 @@ class TabManager_tab(Tab):
     def __init__(self, x, sub, rect, tabs):
         super().__init__(x, "Tab Manager", sub, rect)
         self.obj = TabManagerEdit(tabs)
-        self.obj.active = False
+        self.obj._active = False
         self.obj.visible = False
 
     def on_active(self):
@@ -230,6 +232,26 @@ class SceneTab(Tab):
         self._name = scene_name
 
         self._scene_ = True #attribute used for tab manager
+
+        self.obj = VisualSceneTabEdit(self._name)
+        self.obj._active = False
+        self.obj.visible = False
+    def on_active(self):
+        self.obj.visible = True
+        self.obj._active = True
+    
+    def on_non_active(self):
+        self.save()
+        self.obj.visible = False
+        self.obj._active = False
+
+    def on_close(self):
+        self.save()
+        if self.obj: self.obj.destroy()
+        self.obj = None
+
+    def save(self):
+        if self.obj: self.obj.save()
 
 
 #Object Tab

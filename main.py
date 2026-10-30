@@ -17,7 +17,7 @@ if not py:
 print("Loading PyScene")
 #os.system("python -m pip install --upgrade --no-cache-dir PyScene")
 
-Game.version = "0.2.1"
+Game.version = "0.2.2"
 
 Assets.colors = {}
 

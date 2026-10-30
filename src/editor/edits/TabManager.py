@@ -195,7 +195,7 @@ class Display(GameObj):
         self.sub.render()
 
 class btn():
-    def __init__(self, x, y, w, h, text, sub=None, min_w=-1, max_w=5, color=Colors["b"], toggle=False, _rect=None):
+    def __init__(self, x, y, w, h, text, sub, min_w=-1, max_w=5, color=Colors["b"], toggle=False, _rect=None):
         self.pos = Vector2D(x, y)
         self.size = Vector2D(w, h)
         self.rect = pygame.Rect(self.pos.to_int(), self.size.to_int())
@@ -203,7 +203,6 @@ class btn():
         self.sub: SubScreen = sub
 
         self._r = _rect
-        #if _rect: Rect(_rect.x, _rect.y, _rect.width, _rect.height, "yellow", 9999999999)
         self.min_w = min_w
         self.max_w = max_w
         self.w = min_w
@@ -219,6 +218,7 @@ class btn():
         self.hovered = self.rect.collidepoint(mpos)
         if self.hovered: self.w = self.max_w
         else: self.w = self.min_w
+
         if self.toggle and self.pressed: self.w = self.max_w
 
         if not self.toggle: 
@@ -226,9 +226,12 @@ class btn():
                 self.pressed = True
         else:
             # Handles the toggle logic properly
+            #if Game.click: print(f"checking: mpos: {pygame.mouse.get_pos()}, hit: {self._r.collidepoint(pygame.mouse.get_pos())}, hovered: {self.hovered}, pressed: {self.pressed}")
             if Game.click and self._r.collidepoint(pygame.mouse.get_pos()):
-                if self.hovered:
-                    self.pressed = not self.pressed  # Flips between True and False
+                if self.hovered and not self.pressed:
+                    self.pressed = True  # Flips between True and False
+                elif self.hovered and self.pressed:
+                    self.pressed = False
                 elif self.pressed:
                     self.pressed = False             # Turns off if clicking anywhere else
 
