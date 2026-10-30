@@ -2,6 +2,8 @@ from PyScene import *
 import pygame
 import json
 import time
+import collections.abc
+import copy
 from importlib.metadata import version
 from ..Build import Build
 from ..Runner import Runner
@@ -13,6 +15,7 @@ from ..utils.files import *
 from .Tabs import TabMenue
 
 def RunEditor(project_name, new=False):
+    if not new: update_project_files(project_name)
     print("[Editor] - Running Editor")
     Game.init(1920, 1080, "PyScene-Studio Editor", Colors["bg"], 60, True, True)
     pygame.font.init()
@@ -39,7 +42,7 @@ def RunEditor(project_name, new=False):
 
     Game.quit(False)
     print("[Editor] - Editor Closed")
-    time.sleep(0.3)
+    time.sleep(TIME)
     Game._project_manager()
     
 
@@ -117,5 +120,40 @@ class btn:
     def render(self):
         pygame.draw.rect(self.sub.screen, Colors["b"], self.rect, self.w)
         self.text.render_to(self.sub.screen)
+
+def update_project_files(name):
+    print("[Editor] - Updating Project Files "+name)
+    p = get_save_dir_path()+f"/{name}/"
+    #project file
+    with open(p+"project.json", "r") as f: data = json.load(f)
+    data = update_dict(data, DEFAULTPROJECT.copy())
+    with open(p+"project.json", "w") as f: json.dump(data, f, indent=4)
+
+    #scenes
+    for scene_name in os.listdir(p+"scenes/"):
+        if not scene_name.endswith(".json"): continue
+        with open(p+"scenes/"+scene_name, "r") as f: data = json.load(f)
+        data = update_dict(data, DEFAULTSCENE.copy())
+        with open(p+"scenes/"+scene_name, "w") as f: json.dump(data, f, indent=4)
+
+    #objects
+    for object_name in os.listdir(p+"objects/"):
+        if not object_name.endswith(".json"): continue
+        with open(p+"objects/"+object_name, "r") as f: data = json.load(f)
+        data = update_dict(data, DEFAULTOBJECT.copy())
+        with open(p+"objects/"+object_name, "w") as f: json.dump(data, f, indent=4)
+
+def update_dict(old, new):
+    for k, v in new.items():
+        if k not in old:
+            # Safely clone the new feature/setting so the player owns their own copy
+            old[k] = copy.deepcopy(v)
+        elif isinstance(old[k], collections.abc.Mapping) and isinstance(v, collections.abc.Mapping):
+            # Recursively fill in missing settings inside existing menus
+            update_dict(old[k], v)
+        # If it exists in old as a scalar (e.g., player's high score), it's left completely alone
+            
+    return old
+
 
 

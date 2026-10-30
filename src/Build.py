@@ -30,7 +30,7 @@ class Build:
     def gen_main(self):
         p = self.path+"/_python/main.py"
         i = self.project["window"]
-        #generates the code in the _main.py file
+        #generates the code in the main.py file
         exists(p)
         data = ""
         data += "from PyScene import *\n"
@@ -50,6 +50,7 @@ class Build:
         data = ""
         #create imports
         data += "from PyScene import *\n"
+        data += "import pygame\n"
         #other imports
         imports: list[str] = i["imports"]
         for _i in imports:
@@ -58,8 +59,18 @@ class Build:
         vars: list[str] = i["variables"]
         init = f"Vector2D({vars["pos"][0]}, {vars["pos"][1]}), {vars["z_index"]}, {vars["active"]}, {vars["visible"]}, {vars["Global"]}"
         #create object and basic functions
+
+        #args
+        _args = i["functions"]["__init__"]["args"]
+        args = ""
+        #turn args into a string
+        for _i in _args: args += f"{_i}, "
+        #add comma at brginning and remove from end
+        args = args[:-2]
+        if len(_args) > 0: args = f", {args}"
+
         data += "class "+name+"(GameObj):\n"
-        data += "    def __init__(self):\n" 
+        data += f"    def __init__(self{args}):\n" 
         data += f"        super().__init__({init})\n"
         #code
         code: list[str] = i["functions"]["__init__"]["code"]
@@ -81,6 +92,7 @@ class Build:
         data = ""
         #create imports
         data += "from PyScene import *\n"
+        data += "import pygame\n"
         #other imports
         imports: list[str] = i["imports"]
         for _i in imports:
@@ -88,8 +100,7 @@ class Build:
 
         #create scene and basic functions
         data += "class "+name+"(Scene):\n"
-        data += "    def __init__(self):\n" 
-        data += f"        super().__init__(\"{i['name']}\")\n"
+        data = self._gen_init_scene(p, i, path, data)
         #code
         code: list[str] = i["functions"]["__init__"]["code"]
         for _i in code:
@@ -101,6 +112,28 @@ class Build:
         #write to file
         with open(path, "w") as f:
             f.write(data)
+
+    def _gen_init_scene(self, p: str, i: dict, path: str, data: str):
+        data += "    def __init__(self):\n" 
+        data += f"        super().__init__(\"{i['name']}\")\n"
+
+        #create objects
+        objs: dict[str: dict] = i["objects"]
+        for obj in objs:
+            _type = objs[obj]["obj_type"]
+
+            #args
+            vars: dict = objs[obj]["variables"]
+            #print(len(vars.values()))
+            _args: list[str] = vars.values()
+            args = ""
+            #turn args into a string
+            for _i in _args: args += f"{_i}, "
+            args = args[:-2]
+
+            data += f"        self.{obj} = {_type}({args})\n"
+
+        return data
 
     def createFuncs(self, data, name, i):
         for func in i["functions"]:

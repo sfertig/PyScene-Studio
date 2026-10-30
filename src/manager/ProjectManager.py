@@ -25,8 +25,8 @@ class ProjectManager:
         Game.bg = Assets.colors["bg"]
         Text(Assets.get_font("default-35"), "PyScene-Studio", "white", Vector2D(5, 5), "topleft", 5)
         Text(Assets.get_font("default-23"), f"GUI Version: {Game.version} | PyScene Version: {version("PyScene")}", "white", Vector2D(5, Game.height-20), "topleft", 5)
-        Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["pannel"], -6)
-        Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["btn_around"], 10, 2)
+        Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["pannel"], z_index=-6)
+        Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["btn_around"], 2, 10)
 
         Game.projects = gen_project_lists() #name: path
         Game.RELOAD = False
@@ -235,7 +235,7 @@ class CreateMenue(GameObj):
 
         #gen python folders / files
         os.makedirs(path+"/_python")
-        with open(path+"/_python/_main.py", "w") as f:
+        with open(path+"/_python/main.py", "w") as f:
             f.write("")
         os.mkdir(path+"/_python/data")
         #create engine folders
@@ -252,7 +252,7 @@ class CreateMenue(GameObj):
         #load to editor
         Game.quit(False) #dont close python process
         Assets.colors = {}
-        time.sleep(0.3)
+        time.sleep(TIME)
         RunEditor(name, True)
 
     def render(self):
@@ -416,7 +416,7 @@ class Options(GameObj):
         elif self.btns["edit"].pressed:
             Game.quit(False) #dont close python process
             Assets.colors = {}
-            time.sleep(0.3)
+            time.sleep(TIME)
             RunEditor(self.name)
             
 
