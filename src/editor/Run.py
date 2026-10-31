@@ -26,6 +26,7 @@ def RunEditor(project_name, new=False):
     Game.BREAK = False
     Game.click = False
     Game.RENAMETITLE = False
+    Game.SAVE = False
 
     Game._usableEdit = pygame.Rect(0, 100, Game.width, Game.height-140)
 
@@ -35,6 +36,8 @@ def RunEditor(project_name, new=False):
 
     while True:
         Game.RENAMETITLE = False
+        Game.SAVE = False
+        if Keys.is_pressed(Keys.f1) or (Keys.is_held(Keys.control) and Keys.is_pressed(Keys.s)): Game.SAVE = True
         Game.Tick()
         w.update()
         if Keys.is_held(Keys.shift) and Keys.is_pressed(Keys.escape): Game.quit() #debug / developement exit

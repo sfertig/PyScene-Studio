@@ -100,3 +100,33 @@ DEFAULTOBJECT = {
     }
 }
 
+class _PySceneObjectVarDef:
+    def __init__(self):
+        #vars that are list[dict] containing the definitions of pyscene object input args
+        self.Rect = [
+            {"name": "x", "type": "int", "default": 0},
+            {"name": "y", "type": "int", "default": 0},
+            {"name": "w", "type": "int", "default": 25},
+            {"name": "h", "type": "int", "default": 25},
+            {"name": "color", "type": "color", "default": [0, 255, 0]},
+            {"name": "z_index", "type": "int", "default": 0},
+            {"name": "width", "type": "int", "default": 0},
+            {"name": "active", "type": "bool", "default": True},
+            {"name": "visible", "type": "bool", "default": True},
+            {"name": "offset", "type": "bool", "default": True},
+            {"name": "Global", "type": "bool", "default": False},
+            ]
+        self.Circle = [
+            {"name": "x", "type": "int", "default": 0},
+            {"name": "y", "type": "int", "default": 0},
+            {"name": "r", "type": "int", "default": 25},
+            {"name": "color", "type": "color", "default": [0, 255, 0]},
+            {"name": "width", "type": "int", "default": 0},
+            {"name": "z_index", "type": "int", "default": 0},
+            {"name": "active", "type": "bool", "default": True},
+            {"name": "visible", "type": "bool", "default": True},
+            {"name": "offset", "type": "bool", "default": True},
+            {"name": "Global", "type": "bool", "default": False},
+            ]
+
+PySceneObjectVarDef = _PySceneObjectVarDef()

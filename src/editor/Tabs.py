@@ -61,6 +61,10 @@ class TabMenue(GameObj):
             self.tabs[2].on_active()
 
     def update(self):
+        #global save
+        if Game.SAVE:
+            self.save()
+
         active = False
         for t in self.tabs:
             t.update_tab()
@@ -239,6 +243,7 @@ class SceneTab(Tab):
     def on_active(self):
         self.obj.visible = True
         self.obj._active = True
+        self.obj.gen()
     
     def on_non_active(self):
         self.save()
