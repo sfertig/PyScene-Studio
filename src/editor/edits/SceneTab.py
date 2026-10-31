@@ -218,7 +218,8 @@ class Attribute(GameObj):
 #region Attribute Inputs
 #inputs for different arg types
 
-class IntInput(GameObj):
+
+class _input(GameObj):
     def __init__(self, x, y, w, h, value, sub: SubScreen):
         super().__init__(Vector2D(x, y), visible=False, active=False)
         self.size = Vector2D(w, h)
@@ -228,8 +229,15 @@ class IntInput(GameObj):
         self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["bg"], sub.screen, sub)
         self.r = pygame.Rect((0, 0), self.size.to_int())
         self._rect = pygame.Rect(self.pos.to_int(), self.size.to_int())
-        self.text = self.child(Text(Assets.get_font("default-25"), str(self.value), "white", Vector2D(self.r.centerx, self.r.centery), visible=False))
+
+    def get_value(self): return None
+    def update(self): pass
+    def render(self): pass
         
+class IntInput(_input):
+    def __init__(self, x, y, w, h, value, sub: SubScreen):
+        super().__init__(x, y, w, h, value, sub)
+        self.text = self.child(Text(Assets.get_font("default-25"), str(self.value), "white", Vector2D(self.r.centerx, self.r.centery), visible=False))
         self.w = 0
         self.hovered = False
         self.pressed = False
@@ -279,12 +287,44 @@ class IntInput(GameObj):
 
         self.sub.render()
 
+class BoolInput(_input):
+    def __init__(self, x, y, w, h, value, sub: SubScreen):
+        super().__init__(x+(w//2-12.5), y, 25, 25, value, sub)
+        self.size = Vector2D(25, 25)
+        self.value = value
 
+        self.PSub = sub
+        self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["bg"], sub.screen, sub)
+        self.r = pygame.Rect((0, 0), self.size.to_int())
+        self._rect = pygame.Rect(self.pos.to_int(), self.size.to_int())
+        self.w = 2
+        self.hovered = False
+
+    def get_value(self): return self.value
+
+    def update(self):
+        mpos = self.PSub.local_mouse_pos().to_int()
+        self.hovered = self._rect.collidepoint(mpos)
+        if self.hovered: self.w = 5
+        else: self.w = 2
+
+        if self.value: self.w = 0
+
+        if Game.click and self.hovered:
+            self.value = not self.value
+
+    def render(self):
+        self.sub.clear()
+
+        pygame.draw.rect(self.sub.screen, Colors["b"], self.r, self.w)
+
+        self.sub.render()
 
 #funcs for formatting
 class _types_:
     def __init__(self):
         self.int = IntInput
+        self.bool = BoolInput
 
 _types = _types_()
 

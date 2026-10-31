@@ -43,6 +43,12 @@ def RunEditor(project_name, new=False):
         if Keys.is_held(Keys.shift) and Keys.is_pressed(Keys.escape): Game.quit() #debug / developement exit
         if Game.BREAK: break
 
+        #f6 build
+        if Keys.is_pressed(Keys.f6) or (Keys.is_held(Keys.control) and Keys.is_pressed(Keys.b)): 
+            tabs.save()
+            Build(Game.project)
+
+
     Game.quit(False)
     print("[Editor] - Editor Closed")
     time.sleep(TIME)
