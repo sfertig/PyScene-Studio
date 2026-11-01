@@ -15,42 +15,59 @@ class VisualSceneTabEdit(GameObj):
         self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["bg"], Game.screen)
         self.name = name
 
+        with open(get_save_dir_path()+f"/{Game.project}/scenes/{self.name}.json", "r") as f: self.data: dict = json.load(f)
+
         self.gen()
 
     def gen(self):
-        #load data
-        with open(get_save_dir_path()+f"/{Game.project}/scenes/{self.name}.json", "r") as f: self.data: dict = json.load(f)
-
         #components
 
-        self.r = pygame.Rect(self.sub.dim.x-400, 0, 400, self.sub.dim.y)
-        self.test = pygame.Rect(420, 0, self.sub.dim.x-840, self.sub.dim.y)
+        self._r = pygame.Rect(0, 0, self.size.x, 30)
+        self.r = pygame.Rect(self.sub.dim.x-400, 35, 400, self.sub.dim.y-35)
+        self.test = pygame.Rect(420, 35, self.sub.dim.x-840, self.sub.dim.y-35)
         self.objs = self.child(ObjectsMenue(self.name, self.data, self.sub))
+        self.create = self.child(CreateObj(self.sub, self.data.copy()))
 
     def save(self):
-        print("saving...")
+        #print("saving...\n")
+        #self.print_dict(self.data)
+
+        #self.create.save()
         self.objs.save()
         with open(get_save_dir_path()+f"/{Game.project}/scenes/{self.name}.json", "w") as f: json.dump(self.data, f, indent=4)
 
     def update(self):
+        if self.create.update():
+            self.data["objects"] = self.create.data.copy()
+            self.gen()
+            self.save()
+            return
+
         self.objs.update()
+
+    def print_dict(self, data): #debug func
+        for k, v in data.items():
+            print(k, v)
+            print("\n")
 
     def render(self):
         self.sub.clear()
 
+        pygame.draw.rect(self.sub.screen, Colors["pannel"], self._r, 2)
         pygame.draw.rect(self.sub.screen, Colors["pannel"], self.r)
         pygame.draw.rect(self.sub.screen, Colors["pannel"], self.test)
         self.objs.render()
+        self.create.render()
 
         self.sub.render()
 
 class ObjectsMenue(GameObj):
     def __init__(self, name: str, data: dict, sub: SubScreen):
-        super().__init__(Vector2D(0, 0), visible=False, active=False)
+        super().__init__(Vector2D(0, 35), visible=False, active=False)
         self.scene_name = name
         self.data = data
 
-        self.size = Vector2D(400, sub.dim.y)
+        self.size = Vector2D(400, sub.dim.y-35)
         self._sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["pannel"], sub.screen, sub)
 
         self.title = self.child(Text(Assets.get_font("default-35"), self.scene_name+" Scene Objects:", "white", Vector2D(10, 5), "topleft", visible=False))
@@ -214,6 +231,52 @@ class Attribute(GameObj):
         if self.input: self.input.render()
 
         self.sub.render()
+
+
+class CreateObj(GameObj):
+    def __init__(self, sub: SubScreen, data: dict):
+        super().__init__(Vector2D(0, 0), visible=False, active=False)
+        self.data = data["objects"].copy()
+
+        self.PSub = sub
+        self.btn = btn(0, 0, 200, 30, "Create", sub, -1, 5, Colors["pannel"], True, pygame.Rect((0, 0), (Game.width, Game.height)))
+
+    def save(self):
+        pass
+
+    def update(self):
+        self.btn.update()
+
+        #test / debug
+        if self.btn.pressed:
+            self.create("test", "Rect", PySceneObjectVarDef.Rect.copy())
+            self.btn.pressed = False
+            return True
+        
+        return False
+
+    def create(self, name, _type: str, data: list[dict]):
+        name = self.find_name(name)
+        i = {"obj_type": _type, "variables": {}}
+        for _i in data:
+            i["variables"][_i["name"]] = _i["default"]
+        self.data[name] = i.copy()
+        #print(self.data)
+
+    def find_name(self, name):
+        #make sure the current name isn't already in use
+        name+="0"
+        for k in self.data:
+            if k == name: 
+                num = int(name[-1])
+                num+=1
+                name = name[:-1]
+                name+= str(num)
+        return name
+
+
+    def render(self):
+        self.btn.render()
 
 #region Attribute Inputs
 #inputs for different arg types

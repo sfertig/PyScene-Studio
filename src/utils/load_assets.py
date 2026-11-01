@@ -14,8 +14,12 @@ def load_manager_assets():
     _default(35)
     _default(23)
     #colors
-    with open("assets/Manager_colors.json", "r") as f:
-        Assets.colors = json.load(f)
+    Assets.colors = {
+    "bg": [29, 34, 41],
+    "pannel": [54, 61, 74],
+    "btn_around": [0, 0, 0],
+    "sub": [33, 38, 46]
+}
 def load_editor_assets():
     #default sys fonts
     _default(45)
