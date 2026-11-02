@@ -127,6 +127,7 @@ class PropertiesPannel(GameObj):
 
         self.sub = SubScreen(0, self.pos.y+37, self.size.x, self.size.y-37, Colors["pannel"], self._sub.screen, self._sub)
         self.screen = self.sub.screen
+        self.open = btn(10, self.sub.dim.y-80, self.size.x-20, 30, "Open", self.sub, -1, 3, Colors["b"])
         self.Del = btn(10, self.sub.dim.y-40, self.size.x-20, 30, "Remove", self.sub, -1, 3, (255, 0, 0))
 
         self.attr: list[Attribute] = []
@@ -162,6 +163,9 @@ class PropertiesPannel(GameObj):
     def update(self):
         for attr in self.attr: attr.update()
         self.Del.update()
+        self.open.update()
+        if self.open.pressed or (Keys.is_held(Keys.control) and Keys.is_pressed(Keys.tab)):
+            if not hasattr(PySceneObjectVarDef, self.type): Game._tabs.open_tab(self.name, "_object_", "object")
 
     def render(self):
         self._sub.clear()
@@ -172,6 +176,7 @@ class PropertiesPannel(GameObj):
 
         for attr in self.attr: attr.render()
         self.Del.render()
+        self.open.render()
 
         self.sub.render()
         self._sub.render()

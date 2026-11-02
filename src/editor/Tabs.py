@@ -258,15 +258,33 @@ class SceneTab(Tab):
     def save(self):
         if self.obj: self.obj.save()
 
-
-#Object Tab
 class ObjTab(Tab):
-    def __init__(self, x, obj_name, sub, rect):
-        super().__init__(x, obj_name + " Object", sub, rect)
-        self._name = obj_name
+    def __init__(self, x, scene_name, sub, rect):
+        super().__init__(x, scene_name+" Object", sub, rect)
+        self._name = scene_name
 
         self._object_ = True #attribute used for tab manager
 
+        self.obj = ObjectsTabEdit(self._name)
+        self.obj._active = False
+        self.obj.visible = False
+    def on_active(self):
+        self.obj.visible = True
+        self.obj._active = True
+        self.obj.gen()
+    
+    def on_non_active(self):
+        self.save()
+        self.obj.visible = False
+        self.obj._active = False
+
+    def on_close(self):
+        self.save()
+        if self.obj: self.obj.destroy()
+        self.obj = None
+
+    def save(self):
+        if self.obj: self.obj.save()
 
 #endregion
 

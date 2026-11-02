@@ -31,6 +31,7 @@ def RunEditor(project_name, new=False):
     Game._usableEdit = pygame.Rect(0, 100, Game.width, Game.height-140)
 
     tabs = TabMenue(40, new)
+    Game._tabs = tabs
     w = WINDOW_HEAD(project_name, tabs)
     w._active = False
 
