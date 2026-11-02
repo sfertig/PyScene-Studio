@@ -28,11 +28,10 @@ class VisualSceneTabEdit(GameObj):
     def gen(self):
         #components
 
-        self._r = pygame.Rect(0, 0, self.size.x, 30)
         self.r = pygame.Rect(self.sub.dim.x-400, 35, 400, self.sub.dim.y-35)
         self.test = pygame.Rect(420, 35, self.sub.dim.x-840, self.sub.dim.y-35)
         self.objs = self.child(ObjectsMenue(self.name, self.data, self.sub))
-        self.create = self.child(CreateObj(self.sub, self.data.copy()))
+        self.create = self.child(CreateObj(self.sub, self.data.copy(), self.test))
 
     def save(self):
         #print("saving...\n")
@@ -62,9 +61,8 @@ class VisualSceneTabEdit(GameObj):
     def render(self):
         self.sub.clear()
 
-        pygame.draw.rect(self.sub.screen, Colors["pannel"], self._r, 2)
         pygame.draw.rect(self.sub.screen, Colors["pannel"], self.r)
-        pygame.draw.rect(self.sub.screen, Colors["pannel"], self.test)
+        #pygame.draw.rect(self.sub.screen, Colors["pannel"], self.test)
         self.objs.render()
         self.create.render()
 
