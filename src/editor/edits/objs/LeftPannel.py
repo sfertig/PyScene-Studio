@@ -42,6 +42,7 @@ class Imports(GameObj):
         self._sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["pannel"], sub.screen, sub)
         self.min_sub = SubScreen(5, 40, self.size.x-10, self.size.y-50, Colors["bg"], self._sub.screen, self._sub)
         self.show_sub = SubScreen(0, 50, self.min_sub.dim.x, self.min_sub.dim.y-50, Colors["bg"], self.min_sub.screen, self.min_sub)
+        self.abs = pygame.Rect(self.show_sub.get_absolute_pos().to_int(), self.show_sub.dim.to_int())
         self.data = data
 
         self.input = StrInput(5, 5, 300, 40, "", self.min_sub)
@@ -62,16 +63,17 @@ class Imports(GameObj):
 
 
     def update(self):
-        change = 0
-        for event in Game.events:
-            if event.type == pygame.MOUSEWHEEL: change = event.y*10
-        if change != 0:
-            for item in self.items:
-                item.scroll(change)
+        if self.abs.collidepoint(pygame.mouse.get_pos()):
+            change = 0
+            for event in Game.events:
+                if event.type == pygame.MOUSEWHEEL: change = event.y*10
+            if change != 0:
+                for item in self.items:
+                    item.scroll(change)
 
         for item in self.items:
             item.update()
-            if (item.Del.hovered and Keys.is_pressed(Keys.enter)) and item.text.text not in ["__init__", "update", "render"]:
+            if item.Del.hovered and Keys.is_pressed(Keys.enter):
                 self.items.remove(item)
                 self.data["imports"].remove(item.text.text)
                 self.gen()
@@ -81,7 +83,7 @@ class Imports(GameObj):
 
         if self.input_btn.pressed:
             name = self.input.text.text
-            if name in self.data["imports"]: return
+            if name in self.data["imports"] or name == "": return
             else:
                 self.input.text.set_text("")
                 self.data["imports"].append(name)
@@ -114,6 +116,7 @@ class Functions(GameObj):
         self._sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["pannel"], sub.screen, sub)
         self.min_sub = SubScreen(5, 40, self.size.x-10, self.size.y-50, Colors["bg"], self._sub.screen, self._sub)
         self.show_sub = SubScreen(0, 50, self.min_sub.dim.x, self.min_sub.dim.y-50, Colors["bg"], self.min_sub.screen, self.min_sub)
+        self.abs = pygame.Rect(self.show_sub.get_absolute_pos().to_int(), self.show_sub.dim.to_int())
         self.data = data
 
         self.input = StrInput(5, 5, 300, 40, "", self.min_sub)
@@ -134,12 +137,13 @@ class Functions(GameObj):
 
 
     def update(self):
-        change = 0
-        for event in Game.events:
-            if event.type == pygame.MOUSEWHEEL: change = event.y*10
-        if change != 0:
-            for item in self.items:
-                item.scroll(change)
+        if self.abs.collidepoint(pygame.mouse.get_pos()):
+            change = 0
+            for event in Game.events:
+                if event.type == pygame.MOUSEWHEEL: change = event.y*10
+            if change != 0:
+                for item in self.items:
+                    item.scroll(change)
 
         for item in self.items:
             item.update()
@@ -154,7 +158,7 @@ class Functions(GameObj):
 
         if self.input_btn.pressed:
             name = self.format_input()
-            if name in self.data["functions"]: return
+            if name in self.data["functions"] or name == "": return
             else:
                 self.input.text.set_text("")
                 self.data["functions"][name] = {"args": [], "code": ["pass"]}
