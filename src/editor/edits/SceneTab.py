@@ -1,3 +1,5 @@
+import colorsys
+
 from PyScene import *
 import PyScene
 import pygame
@@ -43,7 +45,10 @@ class VisualSceneTabEdit(GameObj):
             self.save()
             return
 
-        self.objs.update()
+        if self.objs.update():
+            self.gen()
+            self.save()
+            return
 
     def print_dict(self, data): #debug func
         for k, v in data.items():
@@ -93,7 +98,16 @@ class ObjectsMenue(GameObj):
             self.data["objects"][obj.obj_name] = obj.data
 
     def update(self):
-        for obj in self.objs: obj.update()
+        for obj in self.objs: 
+            obj.update()
+            if obj.DEL: 
+                self.objs.remove(obj)
+                #remove from data
+                del self.data["objects"][obj.obj_name]
+                self.save()
+                return True
+
+        return False
 
     def render(self):
         self._sub.clear()
@@ -120,9 +134,10 @@ class _SceneObject(GameObj):
         self.PSub = sub
         pos = sub.get_absolute_pos().to_int()
         r = pygame.Rect(pos, sub.dim.to_int())
-        self.btn = btn(self.pos.x, self.pos.y, self.size.x, self.size.y, self.obj_name, sub, -1, 5, Colors["bg"], True, r)
+        self.btn = btn(self.pos.x, self.pos.y, self.size.x, self.size.y, f"{self.obj_name}  |   ({self.data['obj_type']})", sub, -1, 5, Colors["bg"], True, r)
         self.child(self.btn.text)
         self.props: PropertiesPannel = None
+        self.DEL = False
 
     def save(self):
         if self.props: self.props.save()
@@ -138,6 +153,18 @@ class _SceneObject(GameObj):
             self.props = None
 
         if self.props: self.props.update()
+        if self.props and self.props.Del.pressed:
+            self.destroy()
+            self.props.destroy()
+            self.props = None
+            self.DEL = True
+
+        #name
+        if self.props:
+            name = self.props.attr[0].input.get_value()
+            if name != self.obj_name:
+                self.obj_name = name
+                self.btn.text.set_text(f"{self.obj_name}  |   ({self.data['obj_type']})")
 
     def render(self):
         self.btn.render()
@@ -158,18 +185,20 @@ class PropertiesPannel(GameObj):
 
         self.sub = SubScreen(0, self.pos.y+37, self.size.x, self.size.y-37, Colors["pannel"], self._sub.screen, self._sub)
         self.screen = self.sub.screen
+        self.Del = btn(10, self.sub.dim.y-40, self.size.x-20, 30, "Remove", self.sub, -1, 3, (255, 0, 0))
 
         self.attr: list[Attribute] = []
 
         self.gen()
 
     def save(self):
-        for attr in self.attr: 
+        for attr in self.attr[1:]: 
             if attr.input: self.data["variables"][attr.name] = attr.input.get_value()
 
     def gen(self):
         self.attr.clear()
-        y = 5
+        self.attr.append(self.child(Attribute(5, "Name", "str", self.name, self.sub)))
+        y = self.attr[-1].size.y+10
         #self.attr.append(self.child(Attribute(5, "Test", "str", "test", self.sub)))
         for var in self.data["variables"]:
             #get var type, using args dict or prebuilt
@@ -190,6 +219,7 @@ class PropertiesPannel(GameObj):
 
     def update(self):
         for attr in self.attr: attr.update()
+        self.Del.update()
 
     def render(self):
         self._sub.clear()
@@ -199,6 +229,7 @@ class PropertiesPannel(GameObj):
         pygame.draw.line(self._sub.screen, "black", (5, 35), (self.size.x-5, 35))
 
         for attr in self.attr: attr.render()
+        self.Del.render()
 
         self.sub.render()
         self._sub.render()
@@ -232,14 +263,13 @@ class Attribute(GameObj):
 
         self.sub.render()
 
-
 class CreateObj(GameObj):
     def __init__(self, sub: SubScreen, data: dict):
         super().__init__(Vector2D(0, 0), visible=False, active=False)
         self.data = data["objects"].copy()
 
         self.PSub = sub
-        self.btn = btn(0, 0, 200, 30, "Create", sub, -1, 5, Colors["pannel"], True, pygame.Rect((0, 0), (Game.width, Game.height)))
+        self.btn = btn(0, 0, 200, 30, "+ Add Obj", sub, -1, 5, Colors["pannel"], True, pygame.Rect((0, 0), (Game.width, Game.height)))
 
     def save(self):
         pass
@@ -280,7 +310,6 @@ class CreateObj(GameObj):
 
 #region Attribute Inputs
 #inputs for different arg types
-
 
 class _input(GameObj):
     def __init__(self, x, y, w, h, value, sub: SubScreen):
@@ -383,11 +412,105 @@ class BoolInput(_input):
 
         self.sub.render()
 
+class StrInput(_input):
+    def __init__(self, x, y, w, h, value, sub: SubScreen):
+        super().__init__(x, y, w, h, value, sub)
+        self.text = self.child(Text(Assets.get_font("default-25"), str(self.value), "white", Vector2D(self.r.centerx, self.r.centery), visible=False))
+        self.w = 0
+        self.hovered = False
+        self.pressed = False
+        self.buffer = 0
+
+    def get_value(self) -> int:
+        return self.text.text or ""
+
+    def update(self):
+        if self.buffer < 0: self.buffer = 0
+        mpos = self.PSub.local_mouse_pos().to_int()
+        self.hovered = self._rect.collidepoint(mpos)
+        if self.hovered: self.w = 5
+        else: self.w = -1
+
+        if self.pressed: self.w = 5
+
+        if Game.click:
+            if self.hovered: self.pressed = not self.pressed
+            else: self.pressed = False
+            #if not self.pressed: self.text.set_text(format_int(self.text.text))
+
+        if not self.pressed: return
+        #text input and format
+        text = self.text.text
+        for event in Game.events:
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_BACKSPACE: continue #text = text[:-1]
+                elif event.key == pygame.K_RETURN or event.key == pygame.K_ESCAPE: 
+                    self.pressed = False
+                    text = self.text.text#str(format_int(self.text.text))
+                    break
+                else: text += event.unicode
+        if Keys.is_held(Keys.backspace) and self.buffer == 0: 
+            text = text[:-1]
+            self.buffer = 15
+        elif not Keys.is_held(Keys.backspace): self.buffer = 0
+        if text != self.text.text: self.text.set_text(text)
+        
+
+    def render(self):
+        self.sub.clear()
+
+        pygame.draw.rect(self.sub.screen, Colors["b"], self.r, self.w)
+        self.text.render_to(self.sub.screen)
+
+        self.sub.render()
+
+class ColorInput(_input):
+    def __init__(self, x, y, w, h, value: list[int], sub: SubScreen):
+        super().__init__(x, y, w, h, value, sub)
+        self._r = pygame.Rect(self.r.topleft, (20, self.r.height))
+        self.display = value
+        self.bar_rect = pygame.Rect(22, 0, w-22, h)
+        self.gradient_surface = pygame.Surface((self.bar_rect.width, self.bar_rect.height))
+        for x in range(self.bar_rect.width):
+            hue = x / self.bar_rect.width  # Hue goes from 0.0 to 1.0
+            # Convert HSV to RGB (Saturation=1.0, Value=1.0)
+            rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
+            color = (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))
+            pygame.draw.line(self.gradient_surface, color, (x, 0), (x, self.bar_rect.height))
+
+    def get_value(self): return self.value
+
+    def update(self):
+        self.display = self.value
+        mpos = self.PSub.local_mouse_pos().to_int()
+        if self._rect.collidepoint(mpos):
+            #set display to color at mouse pos
+            pos = self.sub.local_mouse_pos().to_int()
+            pos = (pos[0]-22, pos[1])
+            if pos[0] < 0 or pos[0] >= self.bar_rect.width or pos[1] < 0 or pos[1] >= self.bar_rect.height:
+                return
+            self.display = self.gradient_surface.get_at(pos)
+            if Game.click:
+                self.value = list(self.display)
+        
+
+    def render(self):
+        self.sub.clear()
+
+        pygame.draw.rect(self.sub.screen, self.display, self._r)
+        #pygame.draw.rect(self.sub.screen, Colors["b"], self.r, self.w)
+        self.sub.screen.blit(self.gradient_surface, self.bar_rect.topleft)
+        pygame.draw.line(self.sub.screen, Colors["b"], (20, 0), (20, self.bar_rect.height), 2)
+
+        self.sub.render()
+
 #funcs for formatting
 class _types_:
     def __init__(self):
         self.int = IntInput
         self.bool = BoolInput
+        self.str = StrInput
+        self.color = ColorInput
 
 _types = _types_()
 
