@@ -72,6 +72,15 @@ class _SceneObject(GameObj):
         self.obj_name = name
         self.data = data
 
+        #update self data
+        if not hasattr(PySceneObjectVarDef, self.data["obj_type"]):
+            with open(f"{get_save_dir_path()}/{Game.project}/objects/{self.data['obj_type']}.json", "r") as f: obj_init = json.load(f)
+            for arg in obj_init["functions"]["__init__"]["args"]:
+                k = arg["name"]
+                v = arg["default"]
+                if k not in self.data["variables"]:
+                    self.data["variables"][k] = v
+
         self.display = display
         self.PSub = sub
         pos = sub.get_absolute_pos().to_int()
@@ -165,7 +174,7 @@ class PropertiesPannel(GameObj):
         self.Del.update()
         self.open.update()
         if self.open.pressed or (Keys.is_held(Keys.control) and Keys.is_pressed(Keys.tab)):
-            if not hasattr(PySceneObjectVarDef, self.type): Game._tabs.open_tab(self.name, "_object_", "object")
+            if not hasattr(PySceneObjectVarDef, self.type): Game._tabs.open_tab(self.type, "_object_", "object")
 
     def render(self):
         self._sub.clear()

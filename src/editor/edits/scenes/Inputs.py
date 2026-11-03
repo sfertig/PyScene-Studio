@@ -31,6 +31,7 @@ class IntInput(_input):
         self.hovered = False
         self.pressed = False
         self.buffer = 0
+        self.default = 0
 
     def get_value(self) -> int:
         return int(format_int(self.text.text) or "0")
@@ -88,6 +89,7 @@ class BoolInput(_input):
         self._rect = pygame.Rect(self.pos.to_int(), self.size.to_int())
         self.w = 2
         self.hovered = False
+        self.default = True
 
     def get_value(self): return self.value
 
@@ -117,6 +119,7 @@ class StrInput(_input):
         self.hovered = False
         self.pressed = False
         self.buffer = 0
+        self.default = ""
 
     def get_value(self) -> int:
         return self.text.text or ""
@@ -174,6 +177,7 @@ class ColorInput(_input):
             rgb = colorsys.hsv_to_rgb(hue, 1.0, 1.0)
             color = (int(rgb[0] * 255), int(rgb[1] * 255), int(rgb[2] * 255))
             pygame.draw.line(self.gradient_surface, color, (x, 0), (x, self.bar_rect.height))
+        self.default = [0, 255, 0]
 
     def get_value(self): return self.value
 
@@ -207,6 +211,7 @@ class Vector2DInput:
         self.size = Vector2D(w, h)
         self.value = value
         self.sub = sub
+        self.default = [0, 0]
 
         self.x = IntInput(x, y, w//2-5, h, value[0], sub)
         self.y = IntInput(x+w//2+5, y, w//2-5, h, value[1], sub)

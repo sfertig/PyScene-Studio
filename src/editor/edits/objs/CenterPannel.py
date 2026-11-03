@@ -22,8 +22,9 @@ class CenterPannel(GameObj):
 
         self.data = data
         self.func = "__init__"
-        self.code = CodePannel(self.sub, self.data)
         self.right = RightPannel(sub, data)
+        self.code = CodePannel(self.sub, self.data, self.right)
+        
 
     def save(self): 
         self.right.attr.save()
@@ -49,7 +50,7 @@ class CenterPannel(GameObj):
         self.sub.render()
 
 class CodePannel(GameObj):
-    def __init__(self, sub: SubScreen, data):
+    def __init__(self, sub: SubScreen, data, right: RightPannel):
         super().__init__(Vector2D(10, 55), visible=False, active=False)
         self.size = Vector2D(sub.dim.x-20, sub.dim.y-65)
         self.PSub = sub
@@ -57,10 +58,12 @@ class CodePannel(GameObj):
         self.screen = self.sub.screen
 
         self.data = data
+        self.args: Arguments = right.args
         self.set_func("__init__")
 
     def set_func(self, func):
-        pass
+        self.func = func
+        self.args.set_func(func)
 
     def save(self): #will later write to data
         pass
