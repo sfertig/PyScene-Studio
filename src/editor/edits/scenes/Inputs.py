@@ -201,12 +201,37 @@ class ColorInput(_input):
 
         self.sub.render()
 
+class Vector2DInput:
+    def __init__(self, x, y, w, h, value: list[int], sub: SubScreen):
+        self.pos = Vector2D(x, y)
+        self.size = Vector2D(w, h)
+        self.value = value
+        self.sub = sub
+
+        self.x = IntInput(x, y, w//2-5, h, value[0], sub)
+        self.y = IntInput(x+w//2+5, y, w//2-5, h, value[1], sub)
+        
+
+    def get_value(self): 
+        self.value[0] = self.x.get_value()
+        self.value[1] = self.y.get_value()
+        return self.value
+
+    def update(self):
+        self.x.update()
+        self.y.update()
+
+    def render(self):
+        self.x.render()
+        self.y.render()
+
 class _types_:
     def __init__(self):
         self.int = IntInput
         self.bool = BoolInput
         self.str = StrInput
         self.color = ColorInput
+        self.Vector2D = Vector2DInput
 
 _types = _types_()
 

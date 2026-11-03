@@ -128,5 +128,18 @@ class _PySceneObjectVarDef:
             {"name": "offset", "type": "bool", "default": True},
             {"name": "Global", "type": "bool", "default": False},
             ]
+        self.Line = [
+            {"name": "x1", "type": "int", "default": 0},
+            {"name": "y1", "type": "int", "default": 0},
+            {"name": "x2", "type": "int", "default": 100},
+            {"name": "y2", "type": "int", "default": 100},
+            {"name": "color", "type": "color", "default": [0, 255, 0]},
+            {"name": "width", "type": "int", "default": 1},
+            {"name": "z_index", "type": "int", "default": 0},
+            {"name": "active", "type": "bool", "default": True},
+            {"name": "visible", "type": "bool", "default": True},
+            {"name": "offset", "type": "bool", "default": True},
+            {"name": "Global", "type": "bool", "default": False},
+            ]
 
 PySceneObjectVarDef = _PySceneObjectVarDef()
