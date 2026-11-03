@@ -1,5 +1,3 @@
-import colorsys
-
 from PyScene import *
 import pygame
 import json
@@ -22,9 +20,17 @@ class LeftPannel(GameObj):
         self.imports = self.child(Imports(self.sub, data))
         self.functions = self.child(Functions(self.sub, data))
 
+        self.OPEN = None
+
     def update(self):
+        self.OPEN = None
         self.imports.update()
         self.functions.update()
+
+        for func in self.functions.items:
+            if func.open.pressed: 
+                self.OPEN = func.text.text
+                return
 
     def render(self):
         self.sub.clear()
@@ -133,6 +139,8 @@ class Functions(GameObj):
         y = 5
         for func in self.data["functions"]:
             self.items.append(self.child(Item(y, func, self.show_sub)))
+            if self.items[-1].text.text in ["__init__", "update", "render"]:
+                self.items[-1]._Del = False
             y += self.items[-1].size.y+10
 
 
@@ -193,7 +201,7 @@ class Functions(GameObj):
         self._sub.render()
 
 class Item(GameObj):
-    def __init__(self, y, text, sub: SubScreen, open=True):
+    def __init__(self, y, text, sub: SubScreen, open=True, Del=True):
         super().__init__(Vector2D(10, y), 0, visible=False, active=False)
         self.size = Vector2D(sub.dim.x-20, 30)
         self._rect = pygame.Rect((0, 0), self.size.to_int())
@@ -204,15 +212,16 @@ class Item(GameObj):
 
         self.text = self.child(Text(Assets.get_font("default-25"), text, "white", Vector2D(10, 5), "topleft", visible=False))
         self.Del = btn(self.size.x-45, 3, 42, self.size.y-6, "DEL", self.sub, -1, 0, (255, 0, 0))
-        self.open = btn(self.size.x-95, 3, 45, self.size.y-6, "OPEN", self.sub, -1, 5, Colors["b"])
+        self.open = btn(self.size.x-95, 3, 45, self.size.y-6, "OPEN", self.sub, -1, 0, Colors["b"])
         self._open = open
+        self._Del = Del
 
     def scroll(self, dy):
         self.pos.y += dy
         self.sub.pos.y += dy
 
     def update(self):
-        self.Del.update()
+        if self._Del: self.Del.update()
         if self._open: self.open.update()
 
     def render(self):
@@ -220,7 +229,7 @@ class Item(GameObj):
 
         pygame.draw.rect(self.sub.screen, Colors["pannel"], self._rect, 3)
         self.text.render_to(self.sub.screen)
-        self.Del.render()
+        if self._Del: self.Del.render()
         if self._open: self.open.render()
 
         self.sub.render()

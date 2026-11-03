@@ -10,6 +10,7 @@ from ....utils.files import *
 from ..TabManager import btn
 
 from .LeftPannel import LeftPannel
+from .CenterPannel import CenterPannel
 
 class ObjectsTabEdit(GameObj):
     def __init__(self, name):
@@ -26,22 +27,26 @@ class ObjectsTabEdit(GameObj):
     def gen(self):
         #components
         self.r = pygame.Rect(self.sub.dim.x-400, 0, 400, self.sub.dim.y)
-        self.test = pygame.Rect(420, 0, self.sub.dim.x-840, self.sub.dim.y)
 
         self.left = self.child(LeftPannel(self.sub, self.data))
+        self.center = self.child(CenterPannel(self.sub, self.data))
 
     def save(self):
+        self.center.save()
         with open(get_save_dir_path()+f"/{Game.project}/objects/{self.name}.json", "w") as f: json.dump(self.data, f, indent=4)
 
     def update(self):
         self.left.update()
+        func = self.left.OPEN #will be used for center pannel
+        self.center.update(func)
+
 
     def render(self):
         self.sub.clear()
 
         pygame.draw.rect(self.sub.screen, Colors["pannel"], self.r)
-        pygame.draw.rect(self.sub.screen, Colors["pannel"], self.test)
         self.left.render()
+        self.center.render()
 
         self.sub.render()
 
