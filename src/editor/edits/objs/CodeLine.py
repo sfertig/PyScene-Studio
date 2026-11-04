@@ -32,7 +32,10 @@ class CodeLine(GameObj):
         self.cursorTimer = self.child(Timer(0.5))
         self.show_cursor = False
         self.cursor_index = 0
+        self.scroll_x = 0
         self.backspace_buffer = 0
+        self.just_clicked = False
+        self.selection = None
 
         #flags
         self.DEL = False
@@ -40,6 +43,10 @@ class CodeLine(GameObj):
     def move_y(self, ay):
         self.pos.y += ay
         self._sub.pos.y += ay
+
+    def move_x(self, ax):
+        self.pos.x += ax
+        self._sub.pos.x += ax
 
     def set_code(self, code: str):
         self.code.set_text(code)
@@ -53,11 +60,32 @@ class CodeLine(GameObj):
 
     def set_cursor(self, index):
         self.cursor_index = max(0, min(index, len(self._code)))
-        self.cursor_x = self.font.size(self._code[:self.cursor_index])[0] + 1
+        cursor_x = self.font.size(self._code[:self.cursor_index])[0]
+        visible_width = self.codeSub.dim.x
+        margin = min(20, visible_width // 4)
+        if cursor_x - self.scroll_x < margin:
+            self.scroll_x = max(0, cursor_x - margin)
+        elif cursor_x - self.scroll_x > visible_width - margin:
+            self.scroll_x = cursor_x - visible_width + margin
+        max_scroll = max(0, self.font.size(self._code)[0] - visible_width + margin)
+        self.scroll_x = max(0, min(max_scroll, self.scroll_x))
+        self.update_horizontal_position()
         self.show_cursor = True
         self.cursorTimer.start()
 
+    def scroll_horizontal(self, amount):
+        visible_width = self.codeSub.dim.x
+        margin = min(20, visible_width // 4)
+        max_scroll = max(0, self.font.size(self._code)[0] - visible_width + margin)
+        self.scroll_x = max(0, min(max_scroll, self.scroll_x + amount))
+        self.update_horizontal_position()
+
+    def update_horizontal_position(self):
+        self.code.set_pos(Vector2D(-self.scroll_x, self.size.y / 2))
+        self.cursor_x = self.font.size(self._code[:self.cursor_index])[0] - self.scroll_x + 1
+
     def update(self):
+        self.just_clicked = False
         if self.cursorTimer.is_done():
             self.show_cursor = not self.show_cursor
             self.cursorTimer.start()
@@ -65,57 +93,19 @@ class CodeLine(GameObj):
         mpos = self.codeSub.local_mouse_pos().to_int()
         self.hovered = self.codeRect.collidepoint(mpos)
 
-        if Game.click:
+        left_mouse_down = any(
+            event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+            for event in Game.events
+        )
+        if left_mouse_down or (Game.click and pygame.mouse.get_pressed()[0]):
             self.active = self.hovered
             if self.active:
+                self.just_clicked = True
                 self._on_active()
                 self.set_cursor_from_x(mpos[0])
 
-        if not self.active: return
-
-        for event in Game.events:
-            if event.type == pygame.KEYDOWN:
-                if event.key in (
-                    pygame.K_BACKSPACE,
-                    pygame.K_RETURN,
-                    pygame.K_KP_ENTER,
-                    pygame.K_LEFT,
-                    pygame.K_RIGHT,
-                    pygame.K_UP,
-                    pygame.K_DOWN,
-                    pygame.K_DELETE,
-                ):
-                    continue
-                if event.unicode and event.unicode.isprintable():
-                    inserted = event.unicode
-                    self._code = (
-                        self._code[:self.cursor_index]
-                        + inserted
-                        + self._code[self.cursor_index:]
-                    )
-                    self.set_code(self._code)
-                    self.set_cursor(self.cursor_index + len(inserted))
-
-        if Keys.is_pressed(Keys.left):
-            self.set_cursor(self.cursor_index - 1)
-        elif Keys.is_pressed(Keys.right):
-            self.set_cursor(self.cursor_index + 1)
-
-        self.backspace_buffer = max(0, self.backspace_buffer - 1)
-        if Keys.is_held(Keys.backspace) and self.backspace_buffer == 0:
-            if self.cursor_index == 0:
-                self.DEL = True
-            else:
-                cursor_index = self.cursor_index - 1
-                self._code = self._code[:cursor_index] + self._code[self.cursor_index:]
-                self.code.set_text(self._code)
-                self.set_cursor(cursor_index)
-            self.backspace_buffer = 5
-        elif not Keys.is_held(Keys.backspace):
-            self.backspace_buffer = 0
-
     def set_cursor_from_x(self, x):
-        x = max(0, x)
+        x = max(0, x + self.scroll_x)
         distances = [
             abs(self.font.size(self._code[:index])[0] - x)
             for index in range(len(self._code) + 1)
@@ -126,6 +116,23 @@ class CodeLine(GameObj):
     def render(self):
         self._sub.clear()
         self.codeSub.clear()
+
+        if self.selection is not None:
+            start, end, extends_to_end = self.selection
+            left = self.font.size(self._code[:start])[0] - self.scroll_x
+            right = (
+                self.codeSub.dim.x
+                if extends_to_end
+                else self.font.size(self._code[:end])[0] - self.scroll_x
+            )
+            if extends_to_end and left < self.codeSub.dim.x:
+                right = self.codeSub.dim.x
+            if right > left:
+                pygame.draw.rect(
+                    self.codeSub.screen,
+                    (65, 95, 145),
+                    pygame.Rect(left, 0, right - left, self.size.y),
+                )
 
         self.lineNum.render_to(self._sub.screen)
         self.code.render_to(self.codeSub.screen)

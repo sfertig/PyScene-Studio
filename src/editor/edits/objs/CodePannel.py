@@ -21,6 +21,12 @@ class CodePannel(GameObj):
         self.data = data
         self.args: Arguments = right.args
         self.code: list[CodeLine] = []
+        self.scroll_y = 0
+        self.selection_anchor = None
+        self.selection_focus = None
+        self.selecting = False
+        self.clipboard_ready = False
+        self.backspace_buffer = 0
         self.set_func("__init__")
 
     def set_func(self, func):
@@ -28,16 +34,17 @@ class CodePannel(GameObj):
         self.args.set_func(func)
         self.active_line = 0
 
-        #gen code
         self.code.clear()
-        #set code
+        self.scroll_y = 0
         y = 5
-        i = 0
-        for line in self.data["functions"][func]["code"]:
-            self.code.append(CodeLine(y, self.sub, {}, func, i+1))
-            y += self.code[-1].size.y
-            self.code[i].set_code(line)
-            i += 1
+        for i, code in enumerate(self.data["functions"][func]["code"], start=1):
+            line = CodeLine(y, self.sub, {}, func, i)
+            line.set_code(code)
+            self.code.append(line)
+            y += line.size.y
+
+        if not self.code:
+            self.code.append(CodeLine(y, self.sub, {}, func, 1))
 
     def save(self):
         lines = [line._code for line in self.code]
@@ -47,9 +54,12 @@ class CodePannel(GameObj):
 
     def update(self):
         line_to_delete = None
-        for line in self.code:
+        clicked_line = None
+        for index, line in enumerate(self.code):
             line.update()
             if line.active: self.active_line = line.num-1
+            if line.just_clicked:
+                clicked_line = index
             if line.DEL:
                 line_to_delete = line
                 break
@@ -60,36 +70,279 @@ class CodePannel(GameObj):
         if line_to_delete:
             line_to_delete.DEL = False
 
-        if Keys.is_pressed(Keys.up): self.move_active(-1)
-        elif Keys.is_pressed(Keys.down): self.move_active(1)
+        if clicked_line is not None:
+            self.selection_anchor = (clicked_line, self.code[clicked_line].cursor_index)
+            self.selection_focus = self.selection_anchor
+            self.selecting = True
+        elif Game.click:
+            mouse_pos = self.sub.local_mouse_pos().to_int()
+            if 0 <= mouse_pos[0] < self.size.x and 0 <= mouse_pos[1] < self.size.y:
+                self.selection_anchor = None
+                self.selection_focus = None
 
-        if Keys.is_pressed(Keys.enter) and self.code[self.active_line].active:
-            line_index = max(0, min(self.active_line, len(self.code) - 1))
-            line = self.code[line_index]
-            split_at = max(0, min(line.cursor_index, len(line._code)))
-            following = CodeLine(
-                line.pos.y + line.size.y,
-                self.sub,
-                {},
-                self.func,
-                line_index + 2,
-            )
-            following.set_code(line._code[split_at:])
-            line.set_code(line._code[:split_at])
+        if self.selecting:
+            self.update_mouse_selection()
+        if any(
+            event.type == pygame.MOUSEBUTTONUP and event.button == 1
+            for event in Game.events
+        ):
+            self.selecting = False
 
-            for existing in self.code[line_index + 1:]:
-                existing.move_y(line.size.y)
-            self.code.insert(line_index + 1, following)
+        self.update_selection_state()
 
-            for num, existing in enumerate(self.code, start=1):
-                existing.num = num
-                existing.lineNum.set_text(str(num))
+        focused = any(line.active for line in self.code)
+        if focused:
+            for event in Game.events:
+                if event.type != pygame.KEYDOWN:
+                    continue
+                modifiers = getattr(event, "mod", 0)
+                control = bool(modifiers & pygame.KMOD_CTRL)
+                if control and event.key == pygame.K_c:
+                    self.copy_selection()
+                    continue
+                if control and event.key == pygame.K_v:
+                    pasted = self.get_clipboard_text()
+                    if pasted is not None:
+                        self.replace_selection(pasted)
+                    continue
+                if event.key in (pygame.K_BACKSPACE, pygame.K_RETURN, pygame.K_KP_ENTER,
+                                 pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN):
+                    continue
+                if not control and not (modifiers & pygame.KMOD_ALT) and event.unicode and event.unicode.isprintable():
+                    self.replace_selection(event.unicode)
 
-            line.active = False
-            self.active_line = line_index + 1
-            following.active = True
-            following._on_active()
-            following.set_cursor(0)
+            shift = Keys.is_held(Keys.shift)
+            if Keys.is_pressed(Keys.left):
+                self.move_cursor_horizontal(-1, shift)
+            elif Keys.is_pressed(Keys.right):
+                self.move_cursor_horizontal(1, shift)
+            elif Keys.is_pressed(Keys.up):
+                self.move_cursor_vertical(-1, shift)
+            elif Keys.is_pressed(Keys.down):
+                self.move_cursor_vertical(1, shift)
+
+            self.backspace_buffer = max(0, self.backspace_buffer - 1)
+            if Keys.is_held(Keys.backspace) and self.backspace_buffer == 0:
+                if self.has_selection():
+                    self.replace_selection("")
+                else:
+                    self.backspace()
+                self.backspace_buffer = 5
+            elif not Keys.is_held(Keys.backspace):
+                self.backspace_buffer = 0
+
+            if Keys.is_pressed(Keys.enter):
+                self.replace_selection("\n")
+
+        mouse_pos = self.sub.local_mouse_pos().to_int()
+        if 0 <= mouse_pos[0] < self.size.x and 0 <= mouse_pos[1] < self.size.y:
+            for event in Game.events:
+                if event.type == pygame.MOUSEWHEEL:
+                    modifiers = getattr(event, "mod", 0)
+                    if event.x or ((modifiers & pygame.KMOD_SHIFT) or Keys.is_held(Keys.shift)):
+                        amount = event.x if event.x else event.y
+                        line_index = min(
+                            range(len(self.code)),
+                            key=lambda i: abs(
+                                mouse_pos[1]
+                                - (self.code[i].pos.y + self.code[i].size.y // 2)
+                            ),
+                        )
+                        self.code[line_index].scroll_horizontal(-amount * 60)
+                    else:
+                        self.scroll_vertical(-event.y * self.code[0].size.y * 3)
+
+    def has_selection(self):
+        return (
+            self.selection_anchor is not None
+            and self.selection_focus is not None
+            and self.selection_anchor != self.selection_focus
+        )
+
+    def ordered_selection(self):
+        if self.selection_anchor <= self.selection_focus:
+            return self.selection_anchor, self.selection_focus
+        return self.selection_focus, self.selection_anchor
+
+    def update_selection_state(self):
+        for line in self.code:
+            line.selection = None
+        if not self.has_selection():
+            return
+
+        (start_line, start_index), (end_line, end_index) = self.ordered_selection()
+        for index in range(start_line, end_line + 1):
+            line = self.code[index]
+            if start_line == end_line:
+                segment = (start_index, end_index, False)
+            elif index == start_line:
+                segment = (start_index, len(line._code), True)
+            elif index == end_line:
+                segment = (0, end_index, False)
+            else:
+                segment = (0, len(line._code), True)
+            line.selection = segment
+
+    def update_mouse_selection(self):
+        if not self.code:
+            return
+        mouse_pos = self.sub.local_mouse_pos().to_int()
+        index = min(
+            range(len(self.code)),
+            key=lambda i: abs(mouse_pos[1] - (self.code[i].pos.y + self.code[i].size.y // 2)),
+        )
+        line = self.code[index]
+        line_x = mouse_pos[0] - line.pos.x - 40
+        line.set_cursor_from_x(line_x)
+        for existing in self.code:
+            existing.active = existing is line
+        self.active_line = index
+        self.selection_focus = (index, line.cursor_index)
+
+    def set_cursor_position(self, line_index, cursor_index, extend=False):
+        if not self.code:
+            return
+        line_index = max(0, min(line_index, len(self.code) - 1))
+        line = self.code[line_index]
+        cursor_index = max(0, min(cursor_index, len(line._code)))
+        current = (line_index, cursor_index)
+        if extend:
+            if self.selection_anchor is None:
+                active = self.code[self.active_line]
+                self.selection_anchor = (self.active_line, active.cursor_index)
+            self.selection_focus = current
+        else:
+            self.selection_anchor = None
+            self.selection_focus = None
+
+        for existing in self.code:
+            existing.active = existing is line
+        self.active_line = line_index
+        line.set_cursor(cursor_index)
+        self.ensure_line_visible(line)
+        self.update_selection_state()
+
+    def move_cursor_horizontal(self, direction, extend):
+        if not self.code:
+            return
+        if not extend and self.has_selection():
+            start, end = self.ordered_selection()
+            self.set_cursor_position(*(start if direction < 0 else end))
+            return
+        line_index = self.active_line
+        cursor_index = self.code[line_index].cursor_index + direction
+        if cursor_index < 0 and line_index > 0:
+            line_index -= 1
+            cursor_index = len(self.code[line_index]._code)
+        elif cursor_index > len(self.code[line_index]._code) and line_index + 1 < len(self.code):
+            line_index += 1
+            cursor_index = 0
+        self.set_cursor_position(line_index, cursor_index, extend)
+
+    def move_cursor_vertical(self, direction, extend):
+        if not self.code:
+            return
+        target = max(0, min(len(self.code) - 1, self.active_line + direction))
+        self.set_cursor_position(
+            target,
+            self.code[self.active_line].cursor_index,
+            extend,
+        )
+
+    def selected_text(self):
+        if not self.has_selection():
+            return ""
+        (start_line, start_index), (end_line, end_index) = self.ordered_selection()
+        if start_line == end_line:
+            return self.code[start_line]._code[start_index:end_index]
+        parts = [self.code[start_line]._code[start_index:]]
+        parts.extend(line._code for line in self.code[start_line + 1:end_line])
+        parts.append(self.code[end_line]._code[:end_index])
+        return "\n".join(parts)
+
+    def initialize_clipboard(self):
+        if not self.clipboard_ready:
+            pygame.scrap.init()
+            self.clipboard_ready = True
+
+    def copy_selection(self):
+        if not self.has_selection():
+            return
+        self.initialize_clipboard()
+        pygame.scrap.put(pygame.SCRAP_TEXT, self.selected_text().encode("utf-8"))
+
+    def get_clipboard_text(self):
+        self.initialize_clipboard()
+        contents = pygame.scrap.get(pygame.SCRAP_TEXT)
+        if contents is None:
+            return None
+        return contents.decode("utf-8").rstrip("\x00").replace("\r\n", "\n").replace("\r", "\n")
+
+    def replace_selection(self, text):
+        if not self.code:
+            self.code.append(CodeLine(5, self.sub, {}, self.func, 1))
+
+        if self.has_selection():
+            (start_line, start_index), (end_line, end_index) = self.ordered_selection()
+        else:
+            start_line = end_line = self.active_line
+            start_index = end_index = self.code[self.active_line].cursor_index
+
+        start_line = max(0, min(start_line, len(self.code) - 1))
+        end_line = max(start_line, min(end_line, len(self.code) - 1))
+        start_index = max(0, min(start_index, len(self.code[start_line]._code)))
+        end_index = max(0, min(end_index, len(self.code[end_line]._code)))
+        original_lines = [line._code for line in self.code]
+
+        text = text.replace("\r\n", "\n").replace("\r", "\n")
+        inserted_lines = text.split("\n")
+        prefix = original_lines[start_line][:start_index]
+        suffix = original_lines[end_line][end_index:]
+        replacement_lines = [prefix + inserted_lines[0]]
+        if len(inserted_lines) > 1:
+            replacement_lines.extend(inserted_lines[1:-1])
+            replacement_lines.append(inserted_lines[-1] + suffix)
+        else:
+            replacement_lines[0] += suffix
+        new_text = (
+            original_lines[:start_line]
+            + replacement_lines
+            + original_lines[end_line + 1:]
+        )
+
+        line_height = self.code[0].size.y
+        max_scroll = max(0, 5 + len(new_text) * line_height - self.size.y)
+        self.scroll_y = min(self.scroll_y, max_scroll)
+        self.code = [
+            CodeLine(5 + index * line_height - self.scroll_y, self.sub, {}, self.func, index + 1)
+            for index in range(len(new_text))
+        ]
+        for line, code in zip(self.code, new_text):
+            line.set_code(code)
+
+        self.active_line = start_line + len(inserted_lines) - 1
+        cursor_index = len(inserted_lines[-1])
+        if len(inserted_lines) == 1:
+            cursor_index += len(prefix)
+        for index, line in enumerate(self.code):
+            line.num = index + 1
+            line.lineNum.set_text(str(index + 1))
+            line.active = index == self.active_line
+        self.active_line = max(0, min(self.active_line, len(self.code) - 1))
+        self.code[self.active_line].set_cursor(cursor_index)
+        self.selection_anchor = None
+        self.selection_focus = None
+        self.ensure_line_visible(self.code[self.active_line])
+
+    def backspace(self):
+        line = self.code[self.active_line]
+        if line.cursor_index == 0:
+            if self.active_line > 0 or not line._code:
+                self.del_line(line)
+        else:
+            line._code = line._code[:line.cursor_index - 1] + line._code[line.cursor_index:]
+            line.code.set_text(line._code)
+            line.set_cursor(line.cursor_index - 1)
 
     def del_line(self, line):
         if len(self.code) == 1:
@@ -124,12 +377,42 @@ class CodePannel(GameObj):
         else:
             active._on_active()
         active.backspace_buffer = 15
+        self.clamp_vertical_scroll()
+        self.ensure_line_visible(active)
 
     def move_active(self, dir):
+        if not self.code:
+            return
         self.code[self.active_line].active = False
         self.active_line = max(0, min(len(self.code)-1, self.active_line+dir))
         self.code[self.active_line].active = True
         self.code[self.active_line]._on_active()
+        self.ensure_line_visible(self.code[self.active_line])
+
+    def scroll_vertical(self, amount):
+        if not self.code:
+            return
+        content_bottom = self.code[-1].pos.y + self.code[-1].size.y + self.scroll_y
+        max_scroll = max(0, content_bottom - self.size.y)
+        new_scroll = max(0, min(max_scroll, self.scroll_y + amount))
+        delta = new_scroll - self.scroll_y
+        if delta:
+            for line in self.code:
+                line.move_y(-delta)
+            self.scroll_y = new_scroll
+
+    def clamp_vertical_scroll(self):
+        if not self.code:
+            self.scroll_y = 0
+            return
+        content_bottom = self.code[-1].pos.y + self.code[-1].size.y + self.scroll_y
+        self.scroll_vertical(content_bottom - self.size.y - self.scroll_y)
+
+    def ensure_line_visible(self, line):
+        if line.pos.y < 0:
+            self.scroll_vertical(line.pos.y)
+        elif line.pos.y + line.size.y > self.size.y:
+            self.scroll_vertical(line.pos.y + line.size.y - self.size.y)
 
 
     def render(self):
@@ -140,4 +423,3 @@ class CodePannel(GameObj):
             line.render()
 
         self.sub.render()
-
