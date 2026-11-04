@@ -36,6 +36,7 @@ class CodeLine(GameObj):
         self.backspace_buffer = 0
         self.just_clicked = False
         self.selection = None
+        self.error = None
 
         #flags
         self.DEL = False
@@ -136,6 +137,24 @@ class CodeLine(GameObj):
 
         self.lineNum.render_to(self._sub.screen)
         self.code.render_to(self.codeSub.screen)
+
+        if self.error is not None:
+            start = self.error["start"]
+            end = self.error["end"]
+            x1 = self.font.size(self._code[:start])[0] - self.scroll_x
+            x2 = self.font.size(self._code[:end])[0] - self.scroll_x
+            if x2 <= x1:
+                x2 = x1 + 8
+            x1 = max(0, x1)
+            x2 = min(self.codeSub.dim.x, x2)
+            if x2 > x1:
+                pygame.draw.line(
+                    self.codeSub.screen,
+                    (255, 65, 65),
+                    (x1, self.size.y - 2),
+                    (x2, self.size.y - 2),
+                    2,
+                )
 
         if self.active:
             if self.show_cursor: pygame.draw.line(self.codeSub.screen, "white", (self.cursor_x, 4), (self.cursor_x, self.size.y-4), 2)

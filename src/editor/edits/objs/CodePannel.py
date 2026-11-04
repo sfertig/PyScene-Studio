@@ -10,6 +10,7 @@ from .RightPannel import *
 
 from .CodeLine import CodeLine
 from .CodeCompleter import CodeCompleter
+from .CodeErrors import CodeErrors
 
 class CodePannel(GameObj):
     def __init__(self, sub: SubScreen, data, right: RightPannel):
@@ -29,6 +30,7 @@ class CodePannel(GameObj):
         self.clipboard_ready = False
         self.backspace_buffer = 0
         self.completer = CodeCompleter()
+        self.errors = CodeErrors()
         self.set_func("__init__")
 
     def set_func(self, func):
@@ -48,6 +50,7 @@ class CodePannel(GameObj):
 
         if not self.code:
             self.code.append(CodeLine(y, self.sub, {}, func, 1))
+        self.refresh_errors()
 
     def save(self):
         lines = [line._code for line in self.code]
@@ -180,6 +183,13 @@ class CodePannel(GameObj):
                         self.code[line_index].scroll_horizontal(-amount * 60)
                     else:
                         self.scroll_vertical(-event.y * self.code[0].size.y * 3)
+
+        self.refresh_errors()
+
+    def refresh_errors(self):
+        error_map = self.errors.update([line._code for line in self.code])
+        for index, line in enumerate(self.code):
+            line.error = error_map.get(index)
 
     def has_selection(self):
         return (
@@ -451,6 +461,13 @@ class CodePannel(GameObj):
         for line in self.code:
             line.render()
 
+        hovered_error = next(
+            (line for line in self.code if line.hovered and line.error),
+            None,
+        )
+        if hovered_error:
+            self.render_error_tooltip(hovered_error)
+
         if self.code and self.code[self.active_line].active:
             self.completer.render(
                 self.sub.screen,
@@ -459,3 +476,21 @@ class CodePannel(GameObj):
             )
 
         self.sub.render()
+
+    def render_error_tooltip(self, line):
+        font = Assets.get_font("default-25")
+        message = line.error["message"]
+        padding = 8
+        text = font.render(message, True, "white")
+        width = min(self.size.x, text.get_width() + padding * 2)
+        height = text.get_height() + padding * 2
+        x = max(0, min(line.pos.x + 40, self.size.x - width))
+        y = line.pos.y + line.size.y + 2
+        if y + height > self.size.y:
+            y = line.pos.y - height - 2
+        y = max(0, min(y, self.size.y - height))
+
+        tooltip = pygame.Rect(x, y, width, height)
+        pygame.draw.rect(self.sub.screen, (45, 35, 35), tooltip)
+        pygame.draw.rect(self.sub.screen, (255, 65, 65), tooltip, 1)
+        self.sub.screen.blit(text, (x + padding, y + padding))
