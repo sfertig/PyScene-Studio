@@ -141,7 +141,9 @@ class Build:
         for func in i["functions"]:
             if func == "__init__":
                 continue
-            _args: list[str] = i["functions"][func]["args"]
+            _args_: list[str] = i["functions"][func]["args"]
+            _args = []
+            for _i in _args_: _args.append(_i["name"]) 
             args = ""
             #turn args into a string
             for _i in _args: args += f"{_i}, "

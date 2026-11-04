@@ -102,8 +102,9 @@ class Arguments(GameObj):
         self.items.clear()
         y = 5
         for attr in self.data["functions"][self.func]["args"]:
-            name = attr["name"]
+            name = f"{attr['name']} ({attr['type']})"
             self.items.append(self.child(Item(y, name, self.show_sub, False)))
+            self.items[-1]._name = attr["name"]
             y += self.items[-1].size.y+10
 
     def set_func(self, func):
@@ -123,7 +124,7 @@ class Arguments(GameObj):
             if item.Del.hovered and Keys.is_pressed(Keys.enter):
                 index = None
                 for i in range(len(self.data["functions"][self.func]["args"])):
-                    if self.data["functions"][self.func]["args"][i]["name"] == item.text.text:
+                    if self.data["functions"][self.func]["args"][i]["name"] == item._name:
                         index = i
                         break
                 if index == None: return
@@ -171,6 +172,7 @@ class TypesBox(GameObj):
         self.size = Vector2D(w, h)
         self.PSub = sub
         self._sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["bg"], sub.screen, sub)
+        self.rect = pygame.Rect((0, 0), self.size.to_int())
 
         self.value = self.child(Text(Assets.get_font("default-25"), "int", "white", Vector2D(self.size.x//2, self.size.y//2), visible=False))
         self._value = "int"
@@ -181,6 +183,8 @@ class TypesBox(GameObj):
         self.index = self.types.index(self._value)
 
     def update(self):
+        mpos = self._sub.local_mouse_pos().to_int()
+        if not self.rect.collidepoint(mpos): return
         change = 0
         for event in Game.events:
             if event.type == pygame.MOUSEWHEEL: change = event.y
