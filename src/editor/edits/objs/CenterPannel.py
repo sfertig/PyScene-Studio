@@ -70,13 +70,12 @@ class CodePannel(GameObj):
 
         #gen code
         self.code.clear()
-        y = 5
-        for i in range(20):
-            self.code.append(CodeLine(y, self.sub, {}, func, i+1))
-            y += self.code[-1].size.y
         #set code
+        y = 5
         i = 0
         for line in self.data["functions"][func]["code"]:
+            self.code.append(CodeLine(y, self.sub, {}, func, i+1))
+            y += self.code[-1].size.y
             self.code[i].set_code(line)
             i += 1
 
