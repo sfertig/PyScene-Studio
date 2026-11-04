@@ -9,6 +9,7 @@ from ..scenes.Inputs import StrInput
 from .RightPannel import *
 
 from .CodeLine import CodeLine
+from .CodeCompleter import CodeCompleter
 
 class CodePannel(GameObj):
     def __init__(self, sub: SubScreen, data, right: RightPannel):
@@ -27,6 +28,7 @@ class CodePannel(GameObj):
         self.selecting = False
         self.clipboard_ready = False
         self.backspace_buffer = 0
+        self.completer = CodeCompleter()
         self.set_func("__init__")
 
     def set_func(self, func):
@@ -36,6 +38,7 @@ class CodePannel(GameObj):
 
         self.code.clear()
         self.scroll_y = 0
+        self.completer.hide()
         y = 5
         for i, code in enumerate(self.data["functions"][func]["code"], start=1):
             line = CodeLine(y, self.sub, {}, func, i)
@@ -105,6 +108,19 @@ class CodePannel(GameObj):
                     if pasted is not None:
                         self.replace_selection(pasted)
                     continue
+                if event.key == pygame.K_TAB:
+                    current_init_code = (
+                        [line._code for line in self.code]
+                        if self.func == "__init__"
+                        else None
+                    )
+                    self.completer.update(
+                        self.code[self.active_line],
+                        self.data,
+                        current_init_code,
+                    )
+                    self.completer.complete(self.code[self.active_line])
+                    continue
                 if event.key in (pygame.K_BACKSPACE, pygame.K_RETURN, pygame.K_KP_ENTER,
                                  pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN):
                     continue
@@ -133,6 +149,19 @@ class CodePannel(GameObj):
 
             if Keys.is_pressed(Keys.enter):
                 self.replace_selection("\n")
+
+            current_init_code = (
+                [line._code for line in self.code]
+                if self.func == "__init__"
+                else None
+            )
+            self.completer.update(
+                self.code[self.active_line],
+                self.data,
+                current_init_code,
+            )
+        else:
+            self.completer.hide()
 
         mouse_pos = self.sub.local_mouse_pos().to_int()
         if 0 <= mouse_pos[0] < self.size.x and 0 <= mouse_pos[1] < self.size.y:
@@ -421,5 +450,12 @@ class CodePannel(GameObj):
 
         for line in self.code:
             line.render()
+
+        if self.code and self.code[self.active_line].active:
+            self.completer.render(
+                self.sub.screen,
+                self.code[self.active_line],
+                (self.size.x, self.size.y),
+            )
 
         self.sub.render()
