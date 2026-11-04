@@ -7,6 +7,7 @@ from ....utils.files import *
 from ..TabManager import btn
 from ..scenes.Inputs import StrInput
 from .RightPannel import *
+from .CodeHighlighter import CodeHighlighter
 
 class CodeLine(GameObj):
     def __init__(self, y, sub: SubScreen, data: dict, func, num):
@@ -20,6 +21,7 @@ class CodeLine(GameObj):
         self.codeSub = SubScreen(40, 0, self.size.x-40, self.size.y, Colors["bg"], self._sub.screen, self._sub)
         self.codeRect = pygame.Rect(0, 0, self.size.x-40, self.size.y)
         self.code = self.child(Text(self.font, "", "white", Vector2D(0, self.size.y/2), "centery", visible=False))
+        self.highlighter = CodeHighlighter()
         self._code = ""
 
         self.num = num
@@ -136,7 +138,13 @@ class CodeLine(GameObj):
                 )
 
         self.lineNum.render_to(self._sub.screen)
-        self.code.render_to(self.codeSub.screen)
+        text_y = (self.size.y - self.font.get_height()) // 2
+        for start, segment, color in self.highlighter.get_segments(self._code):
+            if not segment:
+                continue
+            x = self.font.size(self._code[:start])[0] - self.scroll_x
+            rendered = self.font.render(segment, True, color)
+            self.codeSub.screen.blit(rendered, (x, text_y))
 
         if self.error is not None:
             start = self.error["start"]
