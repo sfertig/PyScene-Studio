@@ -12,6 +12,8 @@ from ..TabManager import btn
 from .Inputs import *
 from .Objs import *
 from .Create import *
+from ..objs.LeftPannel import LeftPannel
+from ..objs.CodePannel import CodePannel
 
 class VisualSceneTabEdit(GameObj):
     def __init__(self, name):
@@ -23,6 +25,45 @@ class VisualSceneTabEdit(GameObj):
 
         with open(get_save_dir_path()+f"/{Game.project}/scenes/{self.name}.json", "r") as f: self.data: dict = json.load(f)
 
+        self.script_mode = False
+        self.mode_btn = btn(
+            (self.size.x - 200) // 2,
+            0,
+            200,
+            30,
+            "Visual Mode",
+            self.sub,
+            -1,
+            5,
+            Colors["pannel"],
+        )
+        self.script_left = self.child(LeftPannel(self.sub, self.data))
+        self.script_code_sub = SubScreen(
+            420,
+            0,
+            self.size.x - 420,
+            self.size.y,
+            Colors["pannel"],
+            self.sub.screen,
+            self.sub,
+        )
+        self.script_code_title = self.child(
+            Text(
+                Assets.get_font("default-35"),
+                "__init__",
+                "white",
+                Vector2D(self.script_code_sub.dim.x // 2, 50),
+                visible=False,
+            )
+        )
+        self.script = self.child(
+            CodePannel(
+                self.script_code_sub,
+                self.data,
+                pos=Vector2D(10, 80),
+                height=self.size.y - 90,
+            )
+        )
         self.gen()
 
     def gen(self):
@@ -34,14 +75,26 @@ class VisualSceneTabEdit(GameObj):
         self.create = self.child(CreateObj(self.sub, self.data.copy(), self.test))
 
     def save(self):
-        #print("saving...\n")
-        #self.print_dict(self.data)
-
-        #self.create.save()
         self.objs.save()
+        self.script.save()
         with open(get_save_dir_path()+f"/{Game.project}/scenes/{self.name}.json", "w") as f: json.dump(self.data, f, indent=4)
 
     def update(self):
+        self.mode_btn.update()
+        if self.mode_btn.pressed:
+            self.script_mode = not self.script_mode
+            self.mode_btn.text.set_text(
+                "Script Mode" if self.script_mode else "Visual Mode"
+            )
+            self.save()
+
+        if self.script_mode:
+            self.script_left.update()
+            if self.script_left.OPEN is not None:
+                self.script_code_title.set_text(self.script_left.OPEN)
+            self.script.update(self.script_left.OPEN)
+            return
+
         if self.create.update():
             self.data["objects"] = self.create.data.copy()
             self.gen()
@@ -61,10 +114,23 @@ class VisualSceneTabEdit(GameObj):
     def render(self):
         self.sub.clear()
 
-        pygame.draw.rect(self.sub.screen, Colors["pannel"], self.r)
-        #pygame.draw.rect(self.sub.screen, Colors["pannel"], self.test)
-        self.objs.render()
-        self.create.render()
+        if self.script_mode:
+            pygame.draw.rect(self.sub.screen, Colors["pannel"], (0, 0, 400, self.size.y))
+            self.script_left.render()
+            self.script_code_sub.clear()
+            self.script_code_title.render_to(self.script_code_sub.screen)
+            pygame.draw.line(
+                self.script_code_sub.screen,
+                "black",
+                (10, 75),
+                (self.script_code_sub.dim.x - 10, 75),
+            )
+            self.script.render()
+            self.script_code_sub.render()
+        else:
+            pygame.draw.rect(self.sub.screen, Colors["pannel"], self.r)
+            self.objs.render()
+            self.create.render()
 
+        self.mode_btn.render()
         self.sub.render()
-

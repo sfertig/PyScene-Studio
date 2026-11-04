@@ -13,15 +13,25 @@ from .CodeCompleter import CodeCompleter
 from .CodeErrors import CodeErrors
 
 class CodePannel(GameObj):
-    def __init__(self, sub: SubScreen, data, right: RightPannel):
-        super().__init__(Vector2D(10, 55), visible=False, active=False)
-        self.size = Vector2D(sub.dim.x-20, sub.dim.y-65)
+    def __init__(
+        self,
+        sub: SubScreen,
+        data,
+        right: RightPannel | None = None,
+        args: Arguments | None = None,
+        pos: Vector2D | None = None,
+        height: int | None = None,
+    ):
+        position = pos if pos is not None else Vector2D(10, 55)
+        super().__init__(position, visible=False, active=False)
+        panel_height = height if height is not None else sub.dim.y-position.y-10
+        self.size = Vector2D(sub.dim.x-20, panel_height)
         self.PSub = sub
         self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["bg"], sub.screen, sub)
         self.screen = self.sub.screen
 
         self.data = data
-        self.args: Arguments = right.args
+        self.args: Arguments | None = right.args if right is not None else args
         self.code: list[CodeLine] = []
         self.scroll_y = 0
         self.selection_anchor = None
@@ -35,7 +45,8 @@ class CodePannel(GameObj):
 
     def set_func(self, func):
         self.func = func
-        self.args.set_func(func)
+        if self.args is not None:
+            self.args.set_func(func)
         self.active_line = 0
 
         self.code.clear()
@@ -58,7 +69,11 @@ class CodePannel(GameObj):
             lines.pop()
         self.data["functions"][self.func]["code"] = lines
 
-    def update(self):
+    def update(self, func=None):
+        if func is not None and func != self.func:
+            self.save()
+            self.set_func(func)
+
         line_to_delete = None
         clicked_line = None
         for index, line in enumerate(self.code):

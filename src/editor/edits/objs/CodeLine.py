@@ -16,7 +16,7 @@ class CodeLine(GameObj):
         self.PSub = sub
         self._sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["bg"], sub.screen, sub)
         self.font = Assets.get_font("default-35")
-        self.lineNum = self.child(Text(self.font, str(num), "white", Vector2D(0, 0), "topleft", visible=False))
+        self.lineNum = self.child(Text(self.font, str(num), "white", Vector2D(1, self.size.y/2), "centery", visible=False))
 
         self.codeSub = SubScreen(40, 0, self.size.x-40, self.size.y, Colors["bg"], self._sub.screen, self._sub)
         self.codeRect = pygame.Rect(0, 0, self.size.x-40, self.size.y)

@@ -78,9 +78,17 @@ class Attributes(GameObj):
         self._sub.render()
 
 class Arguments(GameObj):
-    def __init__(self, sub: SubScreen, data):
-        super().__init__(Vector2D(0, 0), visible=False, active=False)
-        self.size = Vector2D(400, sub.dim.y//2-5)
+    def __init__(
+        self,
+        sub: SubScreen,
+        data,
+        pos: Vector2D | None = None,
+        height: int | None = None,
+    ):
+        position = pos if pos is not None else Vector2D(0, 0)
+        super().__init__(position, visible=False, active=False)
+        panel_height = height if height is not None else sub.dim.y//2-5
+        self.size = Vector2D(400, panel_height)
         self.PSub = sub
         self._sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["pannel"], sub.screen, sub)
         self.sub = SubScreen(5, 40, self.size.x-10, self.size.y-50, Colors["pannel"], self._sub.screen, self._sub)
@@ -200,5 +208,4 @@ class TypesBox(GameObj):
 
         self._sub.render()
         
-
 

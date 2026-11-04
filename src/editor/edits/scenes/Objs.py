@@ -123,8 +123,8 @@ class _SceneObject(GameObj):
 
 class PropertiesPannel(GameObj):
     def __init__(self, sub: SubScreen, name, data):
-        super().__init__(Vector2D(sub.dim.x-400, 0), visible=False, active=False)
-        self.size = Vector2D(400, sub.dim.y)
+        super().__init__(Vector2D(sub.dim.x-400, 35), visible=False, active=False)
+        self.size = Vector2D(400, sub.dim.y-35)
         self.name = name
         self.type = data["obj_type"]
         self.data = data
@@ -134,7 +134,7 @@ class PropertiesPannel(GameObj):
 
         self.title = self.child(Text(Assets.get_font("default-35"), "Object Properties:", "white", Vector2D(10, 5), "topleft", visible=False))
 
-        self.sub = SubScreen(0, self.pos.y+37, self.size.x, self.size.y-37, Colors["pannel"], self._sub.screen, self._sub)
+        self.sub = SubScreen(0, 37, self.size.x, self.size.y-37, Colors["pannel"], self._sub.screen, self._sub)
         self.screen = self.sub.screen
         self.open = btn(10, self.sub.dim.y-80, self.size.x-20, 30, "Open", self.sub, -1, 3, Colors["b"])
         self.Del = btn(10, self.sub.dim.y-40, self.size.x-20, 30, "Remove", self.sub, -1, 3, (255, 0, 0))
