@@ -7,7 +7,9 @@ import PyScene
 from PyScene import Assets
 
 
-_TOKEN_PATTERN = re.compile(r"(?P<qualified>(?:[A-Za-z_]\w*\.)*)(?P<prefix>[A-Za-z_]\w*)$")
+_TOKEN_PATTERN = re.compile(
+    r"(?P<qualified>(?:[A-Za-z_]\w*\.)*)(?P<prefix>[A-Za-z_]\w*)?$"
+)
 _SELF_ASSIGNMENT_PATTERN = re.compile(r"\bself\.([A-Za-z_]\w*)\s*(?::[^=]+)?=")
 _FUNCTION_PATTERN = re.compile(r"^\s*def\s+([A-Za-z_]\w*)\s*\(")
 
@@ -28,8 +30,8 @@ class CodeCompleter:
             self.visible = False
             return
 
-        qualified = match.group("qualified").rstrip(".")
-        prefix = match.group("prefix")
+        qualified = (match.group("qualified") or "").rstrip(".")
+        prefix = match.group("prefix") or ""
         if not qualified and not prefix:
             self.suggestions = []
             self.visible = False
@@ -48,6 +50,7 @@ class CodeCompleter:
                 name
                 for name in candidates
                 if name.startswith(prefix) and name != prefix
+                and not (name.startswith("__") and name.endswith("__"))
                 and (prefix.startswith("_") or not name.startswith("_"))
             },
             key=str.casefold,
@@ -68,7 +71,18 @@ class CodeCompleter:
                 return set()
             return self.get_self_members(data, current_init_code)
 
-        roots = {"pygame": pygame, "PyScene": PyScene}
+        roots = {
+            "pygame": pygame,
+            "PyScene": PyScene,
+            "Game": PyScene.Game,
+            "Keys": PyScene.Keys,
+            "GameObj": PyScene.GameObj,
+            "Scene": PyScene.Scene,
+            "SubScreen": PyScene.SubScreen,
+            "Vector2D": PyScene.Vector2D,
+            "Timer": PyScene.Timer,
+            "Assets": PyScene.Assets,
+        }
         obj = roots.get(parts[0])
         if obj is None:
             return set()
