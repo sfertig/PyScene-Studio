@@ -234,7 +234,8 @@ class CreateMenue(GameObj):
             json.dump(data, f, indent=4)
 
         #gen python folders / files
-        os.makedirs(path+"/_python")
+        os.makedirs(path+"/_python/assets")
+        ensure_project_tilemaps_dir(path)
         with open(path+"/_python/main.py", "w") as f:
             f.write("")
         os.mkdir(path+"/_python/data")
@@ -245,9 +246,6 @@ class CreateMenue(GameObj):
         with open(path+"/scenes/main.json", "w") as f:
             json.dump(data, f, indent=4)
         os.makedirs(path+"/objects")
-
-        #create assets folder
-        os.makedirs(path+"/assets")
 
         #load to editor
         Game.quit(False) #dont close python process
@@ -431,4 +429,3 @@ class Options(GameObj):
             btn.render()
 
         self.sub.render()
-

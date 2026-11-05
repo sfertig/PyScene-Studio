@@ -3,6 +3,8 @@ from PyScene import *
 import PyScene
 import pygame
 import json
+import os
+from functools import partial
 
 from ....utils.load_assets import Colors
 from ....utils.files import *
@@ -121,7 +123,7 @@ class StrInput(_input):
         self.buffer = 0
         self.default = ""
 
-    def get_value(self) -> int:
+    def get_value(self) -> str:
         return self.text.text or ""
 
     def update(self):
@@ -205,6 +207,63 @@ class ColorInput(_input):
 
         self.sub.render()
 
+class AssetInput(_input):
+    def __init__(self, x, y, w, h, value, sub: SubScreen, asset_type: str):
+        super().__init__(x, y, w, h, value, sub)
+        project_path = os.path.join(get_save_dir_path(), Game.project)
+        self.asset_type = asset_type
+        self.assets = [
+            definition["name"]
+            for definition in get_project_asset_definitions(project_path, asset_type)
+        ]
+        if not self.value and self.assets:
+            self.value = self.assets[0]
+        self.hovered = False
+
+    def get_value(self) -> str:
+        return self.value
+
+    def update(self):
+        self.hovered = self._rect.collidepoint(self.PSub.local_mouse_pos().to_int())
+        if not Game.click or not self.hovered or not self.assets:
+            return
+
+        mouse_x = self.PSub.local_mouse_pos().x - self._rect.x
+        if self.value in self.assets:
+            index = self.assets.index(self.value)
+        else:
+            index = -1
+        if mouse_x < self.size.x / 2:
+            index = (index - 1) % len(self.assets)
+        else:
+            index = (index + 1) % len(self.assets)
+        self.value = self.assets[index]
+
+    def render(self):
+        self.sub.clear()
+        pygame.draw.rect(self.sub.screen, Colors["b"], self.r, 2 if not self.hovered else 4)
+        font = Assets.get_font("default-25")
+        if not self.assets:
+            label = "No assets"
+        elif self.value not in self.assets:
+            label = f"Missing: {self.value}"
+        else:
+            label = self.value
+
+        max_width = max(0, self.r.width - 44)
+        while label and font.size(label)[0] > max_width:
+            label = label[:-1]
+        if label != self.value and self.value in self.assets:
+            while label and font.size(label + "...")[0] > max_width:
+                label = label[:-1]
+            label += "..."
+
+        self.sub.screen.blit(font.render("<", True, "white"), (5, 2))
+        self.sub.screen.blit(font.render(">", True, "white"), (self.r.width - 18, 2))
+        rendered_label = font.render(label, True, "white")
+        self.sub.screen.blit(rendered_label, rendered_label.get_rect(center=self.r.center))
+        self.sub.render()
+
 class Vector2DInput:
     def __init__(self, x, y, w, h, value: list[int], sub: SubScreen):
         self.pos = Vector2D(x, y)
@@ -237,6 +296,10 @@ class _types_:
         self.str = StrInput
         self.color = ColorInput
         self.Vector2D = Vector2DInput
+        self.image = partial(AssetInput, asset_type="image")
+        self.font = partial(AssetInput, asset_type="font")
+        self.animation = partial(AssetInput, asset_type="animation")
+        self.tileset = partial(AssetInput, asset_type="tileset")
 
         self.screen = SubScreen
 
@@ -245,7 +308,7 @@ _types = _types_()
 def format_int(text):
     #print("formatting...")
     for char in text:
-        if not char.isdigit():
+        if not char.isdigit() and char != "-" and char != ".":
             text = text.replace(char, "")
     if text == "": text = "0"
     return text

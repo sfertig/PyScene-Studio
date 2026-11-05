@@ -80,18 +80,19 @@ class Center_Surface(GameObj):
         i = {"obj_type": _type, "variables": {}}
         for _i in data:
             i["variables"][_i["name"]] = _i["default"]
+        if _type == "Tilemap":
+            i["variables"]["name"] = name
         self.data[name] = i.copy()
         #print(self.data)
 
     def find_name(self, name):
         #make sure the current name isn't already in use
-        name+="0"
-        for k in self.data:
-            if k == name: 
-                num = int(name[-1])
-                num+=1
-                name = name[:-1]
-                name+= str(num)
+        base_name = name
+        index = 0
+        name = f"{base_name}{index}"
+        while name in self.data:
+            index += 1
+            name = f"{base_name}{index}"
         return name
 
     def render(self):
@@ -169,5 +170,4 @@ class PySceneObjs(GameObj):
             obj.render()
 
         self.sub.render()
-
 

@@ -1,4 +1,5 @@
 import os
+import json
 
 ####################
 #  Folder / file initalisation
@@ -10,6 +11,64 @@ def get_save_dir_path() -> str:
     """Stores save data in C:/Users/<Username>/.tearfultilling_saveData"""
     user_home = os.path.expanduser("~")
     return os.path.join(user_home, ".pyscene_studio_projects")
+
+def ensure_project_assets_dir(project_path: str) -> str:
+    python_path = os.path.join(project_path, "_python")
+    assets_path = os.path.join(python_path, "assets")
+    legacy_path = os.path.join(project_path, "assets")
+    os.makedirs(assets_path, exist_ok=True)
+
+    if os.path.isdir(legacy_path):
+        for root, dirs, files in os.walk(legacy_path, topdown=False):
+            relative_root = os.path.relpath(root, legacy_path)
+            target_root = assets_path if relative_root == "." else os.path.join(assets_path, relative_root)
+            os.makedirs(target_root, exist_ok=True)
+
+            for filename in files:
+                source = os.path.join(root, filename)
+                target = os.path.join(target_root, filename)
+                if os.path.exists(target):
+                    base, extension = os.path.splitext(filename)
+                    index = 2
+                    while os.path.exists(target):
+                        target = os.path.join(target_root, f"{base}_{index}{extension}")
+                        index += 1
+                os.replace(source, target)
+
+            if root != legacy_path:
+                os.rmdir(root)
+        os.rmdir(legacy_path)
+
+    return assets_path
+
+def ensure_project_tilemaps_dir(project_path: str) -> str:
+    tilemaps_path = os.path.join(project_path, "_python", ".pyscene", "tilemaps")
+    os.makedirs(tilemaps_path, exist_ok=True)
+    return tilemaps_path
+
+ASSET_INPUT_TYPES = {
+    "image": "image",
+    "font": "font",
+    "animation": "animation",
+    "tileset": "tilemap",
+}
+
+def get_project_asset_definitions(project_path: str, input_type: str) -> list[dict]:
+    definition_type = ASSET_INPUT_TYPES.get(input_type)
+    if definition_type is None:
+        raise ValueError(f"Unsupported asset input type: {input_type!r}")
+
+    manifest_path = os.path.join(ensure_project_assets_dir(project_path), "manifest.json")
+    if not os.path.isfile(manifest_path):
+        return []
+
+    with open(manifest_path, "r") as f:
+        manifest = json.load(f)
+    return [
+        definition
+        for definition in manifest.get("definitions", [])
+        if definition.get("type") == definition_type
+    ]
 
 def init_save_dir():
     
@@ -141,5 +200,53 @@ class _PySceneObjectVarDef:
             {"name": "offset", "type": "bool", "default": True},
             {"name": "Global", "type": "bool", "default": False},
             ]
+        self.Timer = [
+            {"name": "duration", "type": "int", "default": 1},
+            {"name": "active", "type": "bool", "default": True},
+            {"name": "Global", "type": "bool", "default": False},
+        ]
+        self.Image = [
+            {"name": "image", "type": "image", "default": ""},
+            {"name": "pos", "type": "Vector2D", "default": [0, 0]},
+            {"name": "z_index", "type": "int", "default": 0},
+            {"name": "active", "type": "bool", "default": True},
+            {"name": "visible", "type": "bool", "default": True},
+            {"name": "offset", "type": "bool", "default": True},
+            {"name": "Global", "type": "bool", "default": False},
+        ]
+        self.Text = [
+            {"name": "font", "type": "font", "default": ""},
+            {"name": "text", "type": "str", "default": "Text"},
+            {"name": "color", "type": "color", "default": [255, 255, 255]},
+            {"name": "pos", "type": "Vector2D", "default": [0, 0]},
+            {"name": "align", "type": "str", "default": "center"},
+            {"name": "z_index", "type": "int", "default": 0},
+            {"name": "active", "type": "bool", "default": True},
+            {"name": "visible", "type": "bool", "default": True},
+            {"name": "offset", "type": "bool", "default": True},
+            {"name": "Global", "type": "bool", "default": False},
+        ]
+        self.Animation = [
+            {"name": "image", "type": "image", "default": ""},
+            {"name": "size", "type": "int", "default": 16},
+            {"name": "fps", "type": "int", "default": 3},
+            {"name": "loop", "type": "bool", "default": True},
+            {"name": "pos", "type": "Vector2D", "default": [0, 0]},
+            {"name": "z_index", "type": "int", "default": 0},
+            {"name": "active", "type": "bool", "default": True},
+            {"name": "visible", "type": "bool", "default": True},
+            {"name": "offset", "type": "bool", "default": True},
+            {"name": "Global", "type": "bool", "default": False},
+        ]
+        self.Tilemap = [
+            {"name": "name", "type": "str", "default": "tilemap"},
+            {"name": "tileset", "type": "tileset", "default": ""},
+            {"name": "size", "type": "int", "default": 16},
+            {"name": "z_index", "type": "int", "default": 0},
+            {"name": "active", "type": "bool", "default": True},
+            {"name": "visible", "type": "bool", "default": True},
+            {"name": "offset", "type": "bool", "default": True},
+            {"name": "Global", "type": "bool", "default": False},
+        ]
 
 PySceneObjectVarDef = _PySceneObjectVarDef()

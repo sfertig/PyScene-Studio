@@ -1,6 +1,7 @@
 from PyScene import *
 import pygame
 import json
+import os
 import time
 import collections.abc
 import copy
@@ -22,6 +23,9 @@ def RunEditor(project_name, new=False):
     load_editor_assets()
 
     Game.project = project_name
+    project_path = os.path.join(get_save_dir_path(), project_name)
+    ensure_project_assets_dir(project_path)
+    ensure_project_tilemaps_dir(project_path)
     Game.always_global = True
     Game.BREAK = False
     Game.click = False
@@ -164,6 +168,3 @@ def update_dict(old, new):
         # If it exists in old as a scalar (e.g., player's high score), it's left completely alone
             
     return old
-
-
-

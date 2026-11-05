@@ -79,7 +79,7 @@ class TabMenue(GameObj):
     def gen(self, new=False):
         self.tabs.clear()
         self.tabs.append(Settings_tab(10, self.sub, self.r))
-        self.tabs.append(Tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, "Assets", self.sub, self.r))
+        self.tabs.append(AssetsTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, self.sub, self.r))
         self.tabs.append(TabManager_tab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, self.sub, self.r, self))
         self.LPos = (self.tabs[-1].pos.x+self.tabs[-1].size.x+2.5, 5)
         self.tabs.append(SceneTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, "main", self.sub, self.r)) #main scene
@@ -225,6 +225,33 @@ class Settings_tab(Tab):
 
     def save(self):
         if self.obj: self.obj.save()
+
+#Assets
+class AssetsTab(Tab):
+    def __init__(self, x, sub, rect):
+        super().__init__(x, "Assets", sub, rect)
+        self.obj = AssetsTabEdit()
+        self.obj._active = False
+        self.obj.visible = False
+
+    def on_active(self):
+        self.obj.visible = True
+        self.obj._active = True
+
+    def on_non_active(self):
+        self.save()
+        self.obj.visible = False
+        self.obj._active = False
+
+    def on_close(self):
+        self.save()
+        if self.obj:
+            self.obj.destroy()
+            self.obj = None
+
+    def save(self):
+        if self.obj:
+            self.obj.save()
 
 #Tab Manager
 class TabManager_tab(Tab):

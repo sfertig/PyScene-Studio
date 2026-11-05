@@ -17,7 +17,7 @@ if not py:
     Game.Run(False, True) #will quit pyscene once window is closed
 #install and upgrade pyscene
 print("Loading PyScene")
-os.system("python -m pip install --upgrade --no-cache-dir PyScene")
+#os.system("python -m pip install --upgrade --no-cache-dir PyScene")
 
 Game.version = "0.2.4"
 

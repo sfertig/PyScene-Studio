@@ -3,6 +3,7 @@ import PyScene
 import pygame
 import json
 import os
+from PyScene.utils.Assets import load_tileset
 
 from ....utils.load_assets import Colors
 from ....utils.files import *
@@ -21,6 +22,8 @@ class VisualEditor(GameObj):
         self.preview_variables = {}
         self.preview_signature = None
         self.preview_custom_definitions = {}
+        self.preview_asset_definitions = []
+        self.preview_asset_cache = {}
         self.dragged_object = None
         self.dragged_variables = None
         self.axis_font = pygame.font.Font(None, 18)
@@ -31,6 +34,109 @@ class VisualEditor(GameObj):
 
         self.game_size = Vector2D(game_data["window"]["width"], game_data["window"]["height"])
         self.sub = SubScreen(rect.x, rect.y, rect.width, rect.height, game_data["window"]["bg_color"], sub.screen, sub)
+
+    def _load_preview_asset(self, input_type, name):
+        cache_key = (input_type, name)
+        if cache_key in self.preview_asset_cache:
+            return self.preview_asset_cache[cache_key]
+
+        definition_type = ASSET_INPUT_TYPES[input_type]
+        definition = next(
+            (
+                item for item in self.preview_asset_definitions
+                if item.get("type") == definition_type and item.get("name") == name
+            ),
+            None,
+        )
+        if definition is None:
+            raise ValueError(f"Missing {input_type} asset definition: {name!r}")
+
+        project_path = os.path.join(get_save_dir_path(), Game.project)
+        assets_path = ensure_project_assets_dir(project_path)
+        asset_path = os.path.abspath(
+            os.path.join(assets_path, definition["file"].replace("/", os.sep))
+        )
+        assets_root = os.path.abspath(assets_path)
+        try:
+            contained = os.path.commonpath((assets_root, asset_path)) == assets_root
+        except ValueError:
+            contained = False
+        if not contained:
+            raise ValueError(f"Asset path escapes the assets directory: {definition['file']!r}")
+
+        options = definition.get("options", {})
+        if input_type == "image":
+            asset = pygame.image.load(asset_path)
+            if options.get("rect") is not None:
+                asset = asset.subsurface(options["rect"])
+            if options.get("scale", 1.0) != 1.0:
+                asset = pygame.transform.scale_by(asset, options["scale"])
+            asset = asset.convert()
+        elif input_type == "font":
+            asset = pygame.font.Font(asset_path, options["size"])
+        elif input_type == "tileset":
+            asset = pygame.image.load(asset_path).convert_alpha()
+            scale = options.get("scale", 1.0)
+            if scale != 1.0:
+                asset = pygame.transform.scale(
+                    asset,
+                    (int(asset.get_width() * scale), int(asset.get_height() * scale)),
+                )
+            asset, _ = load_tileset(
+                asset,
+                options.get("width", 16) * scale,
+                options.get("height", 16) * scale,
+            )
+        elif input_type == "animation":
+            image = pygame.image.load(asset_path).convert()
+            asset = Animation(
+                image,
+                size=options.get("frame_size", 16),
+                fps=options.get("fps", 3),
+                loop=options.get("loop", True),
+                Global=True,
+            )
+        else:
+            raise ValueError(f"Unsupported asset input type: {input_type!r}")
+
+        self.preview_asset_cache[cache_key] = asset
+        return asset
+
+    def _preview_argument(self, arg, value):
+        input_type = arg.get("type")
+        if input_type in ASSET_INPUT_TYPES:
+            return self._load_preview_asset(input_type, value)
+        if input_type == "Vector2D" and isinstance(value, (list, tuple)) and len(value) == 2:
+            return Vector2D(*value)
+        return value
+
+    def _has_preview_assets(self, arg_definitions, variables):
+        for arg in arg_definitions:
+            input_type = arg.get("type")
+            if input_type not in ASSET_INPUT_TYPES:
+                continue
+            name = variables.get(arg["name"], arg["default"])
+            if not name or not any(
+                definition.get("type") == ASSET_INPUT_TYPES[input_type]
+                and definition.get("name") == name
+                for definition in self.preview_asset_definitions
+            ):
+                return False
+        return True
+
+    def _instantiate_preview_object(self, obj_class, obj_type, obj_args):
+        if obj_type != "Tilemap":
+            return obj_class(*obj_args)
+
+        project_path = os.path.join(get_save_dir_path(), Game.project)
+        python_path = os.path.join(project_path, "_python")
+        ensure_project_tilemaps_dir(project_path)
+        previous_cwd = os.getcwd()
+        try:
+            os.chdir(python_path)
+            return obj_class(*obj_args)
+        finally:
+            os.chdir(previous_cwd)
 
     def center_camera(self):
         Game.cam.pos = Vector2D(
@@ -53,8 +159,22 @@ class VisualEditor(GameObj):
             with open(object_path, "r") as f:
                 custom_definitions[obj_type] = json.load(f)
 
+        project_path = os.path.join(get_save_dir_path(), Game.project)
+        assets_path = ensure_project_assets_dir(project_path)
+        manifest_path = os.path.join(assets_path, "manifest.json")
+        if os.path.isfile(manifest_path):
+            with open(manifest_path, "r") as f:
+                asset_manifest = json.load(f)
+        else:
+            asset_manifest = {"definitions": []}
+        asset_definitions = asset_manifest.get("definitions", [])
+
         signature = json.dumps(
-            {"objects": self.data["objects"], "custom_objects": custom_definitions},
+            {
+                "objects": self.data["objects"],
+                "custom_objects": custom_definitions,
+                "assets": asset_definitions,
+            },
             sort_keys=True,
         )
         if signature == self.preview_signature:
@@ -62,6 +182,8 @@ class VisualEditor(GameObj):
 
         self.preview_objects = []
         self.preview_variables = {}
+        self.preview_asset_definitions = asset_definitions
+        self.preview_asset_cache = {}
         queue_length = len(Game.queue_creation)
         game_id = Game.id
         always_global = Game.always_global
@@ -71,9 +193,20 @@ class VisualEditor(GameObj):
                 obj_type = object_data["obj_type"]
                 obj_class = getattr(PyScene, obj_type, None)
                 if obj_class is not None:
-                    if not callable(getattr(obj_class, "render_to", None)):
+                    if not callable(getattr(obj_class, "render_to", None)) and obj_type != "Tilemap":
                         continue
-                    obj = obj_class(*object_data["variables"].values())
+                    arg_definitions = getattr(PySceneObjectVarDef, obj_type)
+                    variables = object_data["variables"]
+                    if not self._has_preview_assets(arg_definitions, variables):
+                        continue
+                    obj_args = [
+                        self._preview_argument(
+                            arg,
+                            variables.get(arg["name"], arg["default"]),
+                        )
+                        for arg in arg_definitions
+                    ]
+                    obj = self._instantiate_preview_object(obj_class, obj_type, obj_args)
                 else:
                     obj_definition = custom_definitions[obj_type]
                     functions = obj_definition["functions"]
@@ -87,6 +220,9 @@ class VisualEditor(GameObj):
                     source += f"\nclass {obj_type}(GameObj):\n"
 
                     init_args = functions["__init__"]["args"]
+                    variables = object_data["variables"]
+                    if not self._has_preview_assets(init_args, variables):
+                        continue
                     arg_names = [arg["name"] for arg in init_args]
                     source += f"    def __init__(self{', ' if arg_names else ''}{', '.join(arg_names)}):\n"
                     variables = obj_definition["variables"]
@@ -116,12 +252,15 @@ class VisualEditor(GameObj):
                     exec(compile(source, object_path, "exec"), namespace)
                     obj_class = namespace[obj_type]
                     obj_args = [
-                        object_data["variables"].get(arg["name"], arg["default"])
+                        self._preview_argument(
+                            arg,
+                            variables.get(arg["name"], arg["default"]),
+                        )
                         for arg in init_args
                     ]
-                    obj = obj_class(*obj_args)
+                    obj = self._instantiate_preview_object(obj_class, obj_type, obj_args)
 
-                if callable(getattr(obj, "render_to", None)):
+                if callable(getattr(obj, "render_to", None)) or obj_type == "Tilemap":
                     self.preview_objects.append(obj)
                     self.preview_variables[id(obj)] = object_data["variables"]
         finally:
@@ -182,9 +321,19 @@ class VisualEditor(GameObj):
             delta = point - pos
             return delta.x * delta.x + delta.y * delta.y <= radius * radius
 
+        image = getattr(obj, "image", None)
+        if image is None and callable(getattr(obj, "get_image", None)):
+            image = obj.get_image()
+        if isinstance(pos, Vector2D) and isinstance(image, pygame.Surface):
+            return pygame.Rect(pos.to_int(), image.get_size()).collidepoint(point.to_int())
+
         size = getattr(obj, "dim", None)
         if isinstance(pos, Vector2D) and isinstance(size, Vector2D):
             return pygame.Rect(pos.to_int(), size.to_int()).collidepoint(point.to_int())
+
+        surface = getattr(obj, "screen", None)
+        if isinstance(pos, Vector2D) and isinstance(surface, pygame.Surface):
+            return pygame.Rect(pos.to_int(), surface.get_size()).collidepoint(point.to_int())
 
         if isinstance(pos, Vector2D):
             delta = point - pos
@@ -236,11 +385,24 @@ class VisualEditor(GameObj):
             {
                 "objects": self.data["objects"],
                 "custom_objects": self.preview_custom_definitions,
+                "assets": self.preview_asset_definitions,
             },
             sort_keys=True,
         )
 
     def render_preview_object(self, obj):
+        if isinstance(obj, PyScene.Tilemap):
+            project_path = os.path.join(get_save_dir_path(), Game.project)
+            python_path = os.path.join(project_path, "_python")
+            previous_cwd = os.getcwd()
+            try:
+                os.chdir(python_path)
+                obj.update()
+            finally:
+                os.chdir(previous_cwd)
+            if not obj.tilemap:
+                return
+
         camera_pos = Game.cam.pos
         original_pos = getattr(obj, "pos", None)
         original_rect = getattr(obj, "rect", None)
@@ -268,7 +430,10 @@ class VisualEditor(GameObj):
                 setattr(obj, axis, original_axes[axis] - offset)
 
         try:
-            obj.render_to(self.sub.screen)
+            if isinstance(obj, PyScene.Tilemap):
+                self.sub.screen.blit(obj.screen, obj.pos.to_int())
+            else:
+                obj.render_to(self.sub.screen)
         finally:
             if original_pos is not None:
                 obj.pos = original_pos
@@ -283,6 +448,9 @@ class VisualEditor(GameObj):
         viewport = pygame.Rect((0, 0), self.sub.dim.to_int())
         absolute_pos = self.sub.get_absolute_pos()
         self.refresh_preview_objects()
+        for obj in self.preview_objects:
+            if isinstance(obj, PyScene.Animation):
+                obj.update()
 
         for event in Game.events:
             if event.type == pygame.KEYDOWN and event.key == pygame.K_f:
