@@ -12,6 +12,7 @@ from ..TabManager import btn
 from .Inputs import *
 from .Objs import *
 from .Create import *
+from .VisualPannel import VisualEditor
 from ..objs.LeftPannel import LeftPannel
 from ..objs.CodePannel import CodePannel
 
@@ -73,6 +74,9 @@ class VisualSceneTabEdit(GameObj):
         self.test = pygame.Rect(420, 35, self.sub.dim.x-840, self.sub.dim.y-35)
         self.objs = self.child(ObjectsMenue(self.name, self.data, self.sub))
         self.create = self.child(CreateObj(self.sub, self.data.copy(), self.test))
+        self.visual_editor = self.child(
+            VisualEditor(self.test, self.sub, self.data)
+        )
 
     def save(self):
         self.objs.save()
@@ -100,6 +104,8 @@ class VisualSceneTabEdit(GameObj):
             self.gen()
             self.save()
             return
+
+        self.visual_editor.update()
 
         if self.objs.update():
             self.gen()
@@ -129,6 +135,8 @@ class VisualSceneTabEdit(GameObj):
             self.script_code_sub.render()
         else:
             pygame.draw.rect(self.sub.screen, Colors["pannel"], self.r)
+            self.visual_editor.render()
+            #pygame.draw.rect(self.sub.screen, Colors["pannel"], self.test)
             self.objs.render()
             self.create.render()
 
