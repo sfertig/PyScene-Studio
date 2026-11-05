@@ -71,8 +71,8 @@ class WINDOW_HEAD(GameObj): #window head for quick options (and bottom versions 
         self.build = btn(Game.width-160, 100, "Build", self.sub)
         self.run = btn(Game.width-270, 100, "Run", self.sub)
 
-        r = self.child(Rect(0, Game.height-30, Game.width, 30, Colors["pannel"], 0, 10))
-        self.child(Text(Assets.get_font("default-25"), f"GUI Version: {Game.version} | PyScene Version: {version("PyScene")}", "white", Vector2D(5, r.pos.y+r.rect.height/2), "midleft", 100))
+        r = self.child(Rect(0, Game.height-30, Game.width, 30, Colors["pannel"], 0, 10, offset=False))
+        self.child(Text(Assets.get_font("default-25"), f"GUI Version: {Game.version} | PyScene Version: {version("PyScene")}", "white", Vector2D(5, r.pos.y+r.rect.height/2), "midleft", 100, offset=False))
 
     def update(self):
         if Game.RENAMETITLE:

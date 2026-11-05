@@ -28,23 +28,53 @@ class TabMenue(GameObj):
             tab.save()
 
     def open_tab(self, name, _type, id): #name, _type_, id(scene / object)
-        #close current tab
-        for tab in self.tabs:
-            if tab.active: 
-                tab.active = False
-                tab.on_non_active()
+        if id not in ("scene", "object"):
+            return
+
         #check it its already exists / is open
         for tab in self.tabs:
             if hasattr(tab, _type):
                 if tab._name == name: #change to this tab
+                    for active_tab in self.tabs:
+                        if active_tab.active and active_tab is not tab:
+                            active_tab.active = False
+                            active_tab.on_non_active()
                     tab.active = True
                     tab.on_active()
                     return
+        for tab in self.tabs:
+            if tab.active:
+                tab.active = False
+                tab.on_non_active()
         print(f"[TabMenue] - Opening new {id} tab: "+name)
         if id == "scene": self.tabs.append(SceneTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, name, self.sub, self.r))
         elif id == "object": self.tabs.append(ObjTab(self.tabs[-1].pos.x+self.tabs[-1].size.x+5, name, self.sub, self.r))
         self.tabs[-1].active = True
         self.tabs[-1].on_active()
+
+    def close_tab(self, tab):
+        if tab not in self.tabs or not hasattr(tab, "_name"):
+            return False
+
+        index = self.tabs.index(tab)
+        was_active = tab.active
+        tab.close()
+        self.tabs.remove(tab)
+        self._layout_tabs()
+
+        if was_active and self.tabs:
+            replacement = self.tabs[min(index, len(self.tabs) - 1)]
+            replacement.active = True
+            replacement.on_active()
+        return True
+
+    def _layout_tabs(self):
+        x = self.tabs[0].pos.x
+        previous = self.tabs[0]
+        for tab in self.tabs[1:]:
+            x += previous.size.x + 5
+            tab.move(x)
+            previous = tab
 
     def gen(self, new=False):
         self.tabs.clear()
@@ -66,7 +96,9 @@ class TabMenue(GameObj):
             self.save()
 
         active = False
-        for t in self.tabs:
+        for t in self.tabs.copy():
+            if t not in self.tabs:
+                continue
             t.update_tab()
             if t.active: active = True
         if not active: 
@@ -82,25 +114,10 @@ class TabMenue(GameObj):
             self.remove_active()
 
     def remove_active(self):
-        index = 0
-        for t in self.tabs[3:]:
-            if t.active: index = self.tabs.index(t)
-        if index == 0: return
-        self.tabs[index].close()
-        self.tabs[index].on_close()
-        self.tabs.remove(self.tabs[index])
-        #move tabs to the left
-        tabs: list[Tab] = []
-        for t in self.tabs[index:]:
-            tabs.append(t)
-            self.tabs.remove(t)
-        if len(tabs) > 0: tabs[0].active = True
-        else: 
-            self.tabs[-1].active = True #Tab Manager
-            self.tabs[-1].on_active()
-        for t in tabs:
-            t.move(self.tabs[-1].pos.x+self.tabs[-1].size.x+5)
-            self.tabs.append(t)
+        for tab in self.tabs[3:]:
+            if tab.active:
+                self.close_tab(tab)
+                return
 
 
     def render(self):
@@ -144,6 +161,7 @@ class Tab:
     def move(self, amount):
         self.pos.x = amount
         self.sub.pos.x = amount
+        self.text.set_pos(Vector2D(self.size.x / 2, self.size.y / 2))
     
     def update_tab(self):
         mpos = self.sub.local_mouse_pos().to_int()
@@ -287,4 +305,3 @@ class ObjTab(Tab):
         if self.obj: self.obj.save()
 
 #endregion
-

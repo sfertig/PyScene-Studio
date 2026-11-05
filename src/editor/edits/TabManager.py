@@ -129,6 +129,8 @@ class Display(GameObj):
         self.gen()
 
     def gen(self):
+        for scene in self.scenes:
+            scene.text.destroy()
         self.scenes.clear()
         y = 5
         w = self.sub.dim.x-20
@@ -147,34 +149,32 @@ class Display(GameObj):
         self.delete.update()
 
         self.show_options = False
-        for s in self.scenes: 
+        for s in self.scenes.copy():
             s.update()
             if s.pressed: self.show_options = True
 
-        for s in self.scenes:
-            if s.pressed: self.check_open(s)
+        for s in self.scenes.copy():
+            if s.pressed and self.check_open(s):
+                return
 
     def check_open(self, scene):
-        #print(f"checking {scene.text.text}, open: {self.open.pressed}")
         if scene.pressed and self.open.pressed:
-            #print("open scene")
-            #check if tab is alread open
             name = scene.text.text
             self.tabs.open_tab(name, self._name_, self.name)
-        #del
+            return False
         elif scene.pressed and self.delete.hovered and Keys.is_pressed(Keys.enter):
-            #check if scene is main, that dosnt delete
-            if scene.text.text == "main": return
-            #close tab if open
-            for tab in self.tabs.tabs:
+            name = scene.text.text
+            if self.name == "scene" and name == "main":
+                return False
+            for tab in self.tabs.tabs.copy():
                 if hasattr(tab, self._name_): 
-                    if tab._name == scene.text.text:
-                        tab.close()
-                        break
-            #delete file
-            os.remove(get_save_dir_path()+f"/{Game.project}/{self.name}s/{scene.text.text}.json")
-            print(f"[TabManager] - {self.name} Deleted: "+scene.text.text)
+                    if tab._name == name:
+                        self.tabs.close_tab(tab)
+            os.remove(get_save_dir_path()+f"/{Game.project}/{self.name}s/{name}.json")
+            print(f"[TabManager] - {self.name} Deleted: "+name)
             self.gen()
+            return True
+        return False
 
 
     def render(self):

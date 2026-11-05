@@ -156,9 +156,12 @@ class Functions(GameObj):
         for item in self.items:
             item.update()
             if (item.Del.hovered and Keys.is_pressed(Keys.enter)) and item.text.text not in ["__init__", "update", "render"]:
+                function_name = item.text.text
+                self.prepare_open_editors_for_function_removal(function_name)
                 self.items.remove(item)
-                del self.data["functions"][item.text.text]
+                del self.data["functions"][function_name]
                 self.gen()
+                return
 
         self.input.update()
         self.input_btn.update()
@@ -171,6 +174,27 @@ class Functions(GameObj):
                 self.input.text.set_text("")
                 self.data["functions"][name] = {"args": [], "code": ["pass"]}
                 self.gen()
+
+    def prepare_open_editors_for_function_removal(self, function_name):
+        tabs = getattr(getattr(Game, "_tabs", None), "tabs", [])
+        for tab in tabs:
+            object_editor = getattr(tab, "obj", None)
+            if getattr(object_editor, "data", None) is not self.data:
+                continue
+
+            center = getattr(object_editor, "center", None)
+            if center is not None and center.func == function_name:
+                center.save()
+                center.func = "__init__"
+                center.title.set_text("__init__")
+                center.code.set_func("__init__")
+                center.right.args.set_func("__init__")
+
+            script = getattr(object_editor, "script", None)
+            if script is not None and script.func == function_name:
+                script.save()
+                script.set_func("__init__")
+                object_editor.script_code_title.set_text("__init__")
 
     def format_input(self):
         text = self.input.text.text

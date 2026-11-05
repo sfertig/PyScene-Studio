@@ -25,8 +25,8 @@ class ProjectManager:
         Game.bg = Assets.colors["bg"]
         Text(Assets.get_font("default-35"), "PyScene-Studio", "white", Vector2D(5, 5), "topleft", 5)
         Text(Assets.get_font("default-23"), f"GUI Version: {Game.version} | PyScene Version: {version("PyScene")}", "white", Vector2D(5, Game.height-20), "topleft", 5)
-        Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["pannel"], z_index=-6)
-        Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["btn_around"], 2, 10)
+        Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["pannel"], z_index=-6, offset=False)
+        Rect(5, 40, Game.width-10,  Game.height-75, Assets.colors["btn_around"], 2, 10, offset=False)
 
         Game.projects = gen_project_lists() #name: path
         Game.RELOAD = False

@@ -238,6 +238,8 @@ class _types_:
         self.color = ColorInput
         self.Vector2D = Vector2DInput
 
+        self.screen = SubScreen
+
 _types = _types_()
 
 def format_int(text):

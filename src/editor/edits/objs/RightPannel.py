@@ -1,6 +1,7 @@
 from PyScene import *
 import pygame
 import json
+import os
 
 from ....utils.load_assets import Colors
 from ....utils.files import *
@@ -11,6 +12,65 @@ from .LeftPannel import Item
 from..scenes.Objs import Attribute as _attr
 
 #This file contains both functions and import manager
+
+def remove_scene_object_argument(project, object_type, argument_name):
+    tabs = getattr(getattr(Game, "_tabs", None), "tabs", [])
+    for tab in tabs:
+        scene_editor = getattr(tab, "obj", None)
+        scene_data = getattr(scene_editor, "data", None)
+        if not isinstance(scene_data, dict):
+            continue
+
+        changed = False
+        for scene_object in scene_data.get("objects", {}).values():
+            if scene_object.get("obj_type") != object_type:
+                continue
+
+            variables = scene_object.get("variables", {})
+            if argument_name in variables:
+                del variables[argument_name]
+                changed = True
+
+            objects_menu = getattr(scene_editor, "objs", None)
+            for scene_object_editor in getattr(objects_menu, "objs", []):
+                if scene_object_editor.data is not scene_object:
+                    continue
+                properties = scene_object_editor.props
+                if properties is None:
+                    continue
+                removed_attributes = [
+                    attr for attr in properties.attr if attr.name == argument_name
+                ]
+                properties.attr = [
+                    attr for attr in properties.attr if attr.name != argument_name
+                ]
+                for attr in removed_attributes:
+                    attr.destroy()
+
+        if changed:
+            scene_editor.save()
+
+    scenes_path = os.path.join(get_save_dir_path(), project, "scenes")
+    for filename in os.listdir(scenes_path):
+        if not filename.endswith(".json"):
+            continue
+
+        scene_path = os.path.join(scenes_path, filename)
+        with open(scene_path, "r") as f:
+            scene_data = json.load(f)
+
+        changed = False
+        for scene_object in scene_data.get("objects", {}).values():
+            if scene_object.get("obj_type") == object_type:
+                variables = scene_object.get("variables", {})
+                if argument_name in variables:
+                    del variables[argument_name]
+                    changed = True
+
+        if changed:
+            with open(scene_path, "w") as f:
+                json.dump(scene_data, f, indent=4)
+
 
 class RightPannel(GameObj):
     def __init__(self, sub: SubScreen, data):
@@ -122,6 +182,26 @@ class Arguments(GameObj):
     def save(self):
         pass
 
+    def persist_argument_removal(self, argument_name):
+        object_type = self.data["name"]
+        remove_scene_object_argument(Game.project, object_type, argument_name)
+
+        tabs = getattr(getattr(Game, "_tabs", None), "tabs", [])
+        for tab in tabs:
+            object_editor = getattr(tab, "obj", None)
+            if getattr(object_editor, "data", None) is self.data:
+                object_editor.save()
+                return
+
+        object_path = os.path.join(
+            get_save_dir_path(),
+            Game.project,
+            "objects",
+            f"{object_type}.json",
+        )
+        with open(object_path, "w") as f:
+            json.dump(self.data, f, indent=4)
+
     def update(self):
         self.input.update()
         self.add_btn.update()
@@ -136,7 +216,9 @@ class Arguments(GameObj):
                         index = i
                         break
                 if index == None: return
-                self.data["functions"][self.func]["args"].pop(index)
+                removed_arg = self.data["functions"][self.func]["args"].pop(index)
+                if self.func == "__init__":
+                    self.persist_argument_removal(removed_arg["name"])
                 self.gen()
 
         if self.add_btn.pressed:
@@ -154,6 +236,7 @@ class Arguments(GameObj):
         elif _type == "bool": return True
         elif _type == "color": return [0, 0, 0]
         elif _type == "Vector2D": return [0, 0]
+        elif _type == "screen": return None
         return None
 
     def render(self):
@@ -208,4 +291,3 @@ class TypesBox(GameObj):
 
         self._sub.render()
         
-

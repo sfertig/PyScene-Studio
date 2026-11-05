@@ -14,6 +14,14 @@ from .CodeErrors import CodeErrors
 from .CodeSignatureHelp import CodeSignatureHelp
 
 class CodePannel(GameObj):
+    AUTO_PAIRS = {
+        "(": ")",
+        "[": "]",
+        "{": "}",
+        "'": "'",
+        '"': '"',
+    }
+
     def __init__(
         self,
         sub: SubScreen,
@@ -150,7 +158,13 @@ class CodePannel(GameObj):
                                  pygame.K_LEFT, pygame.K_RIGHT, pygame.K_UP, pygame.K_DOWN):
                     continue
                 if not control and not (modifiers & pygame.KMOD_ALT) and event.unicode and event.unicode.isprintable():
-                    self.replace_selection(event.unicode)
+                    character = event.unicode
+                    if character in self.AUTO_PAIRS.values() and self.skip_closing_pair(character):
+                        continue
+                    if character in self.AUTO_PAIRS:
+                        self.insert_pair(character, self.AUTO_PAIRS[character])
+                    else:
+                        self.replace_selection(character)
 
             shift = Keys.is_held(Keys.shift)
             if Keys.is_pressed(Keys.left):
@@ -406,8 +420,48 @@ class CodePannel(GameObj):
         self.selection_focus = None
         self.ensure_line_visible(self.code[self.active_line])
 
+    def insert_pair(self, opening, closing):
+        if self.has_selection():
+            (start_line, start_index), _ = self.ordered_selection()
+            selected = self.selected_text()
+            selected_lines = selected.split("\n")
+            self.replace_selection(opening + selected + closing)
+            cursor_line = start_line + len(selected_lines) - 1
+            cursor_index = (
+                start_index + len(opening) + len(selected_lines[0])
+                if len(selected_lines) == 1
+                else len(selected_lines[-1])
+            )
+            self.set_cursor_position(cursor_line, cursor_index)
+            return
+
+        self.replace_selection(opening + closing)
+        line = self.code[self.active_line]
+        line.set_cursor(line.cursor_index - len(closing))
+        self.ensure_line_visible(line)
+
+    def skip_closing_pair(self, closing):
+        if self.has_selection() or not self.code:
+            return False
+        line = self.code[self.active_line]
+        if line.cursor_index >= len(line._code) or line._code[line.cursor_index] != closing:
+            return False
+        line.set_cursor(line.cursor_index + 1)
+        self.ensure_line_visible(line)
+        return True
+
     def backspace(self):
         line = self.code[self.active_line]
+        if line.cursor_index > 0 and line.cursor_index < len(line._code):
+            opening = line._code[line.cursor_index - 1]
+            closing = line._code[line.cursor_index]
+            if self.AUTO_PAIRS.get(opening) == closing:
+                cursor_index = line.cursor_index
+                line._code = line._code[:cursor_index - 1] + line._code[cursor_index + 1:]
+                line.code.set_text(line._code)
+                line.set_cursor(cursor_index - 1)
+                return
+
         if line.cursor_index == 0:
             if self.active_line > 0 or not line._code:
                 self.del_line(line)
