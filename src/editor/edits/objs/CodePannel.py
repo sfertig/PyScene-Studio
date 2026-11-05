@@ -11,6 +11,7 @@ from .RightPannel import *
 from .CodeLine import CodeLine
 from .CodeCompleter import CodeCompleter
 from .CodeErrors import CodeErrors
+from .CodeSignatureHelp import CodeSignatureHelp
 
 class CodePannel(GameObj):
     def __init__(
@@ -40,6 +41,7 @@ class CodePannel(GameObj):
         self.clipboard_ready = False
         self.backspace_buffer = 0
         self.completer = CodeCompleter()
+        self.signature_help = CodeSignatureHelp()
         self.errors = CodeErrors()
         self.set_func("__init__")
 
@@ -76,6 +78,10 @@ class CodePannel(GameObj):
 
         line_to_delete = None
         clicked_line = None
+        left_mouse_down = any(
+            event.type == pygame.MOUSEBUTTONDOWN and event.button == 1
+            for event in Game.events
+        )
         for index, line in enumerate(self.code):
             line.update()
             if line.active: self.active_line = line.num-1
@@ -91,11 +97,12 @@ class CodePannel(GameObj):
         if line_to_delete:
             line_to_delete.DEL = False
 
-        if clicked_line is not None:
+        if left_mouse_down and clicked_line is not None:
             self.selection_anchor = (clicked_line, self.code[clicked_line].cursor_index)
             self.selection_focus = self.selection_anchor
             self.selecting = True
-        elif Game.click:
+        elif left_mouse_down:
+            self.selecting = False
             mouse_pos = self.sub.local_mouse_pos().to_int()
             if 0 <= mouse_pos[0] < self.size.x and 0 <= mouse_pos[1] < self.size.y:
                 self.selection_anchor = None
@@ -178,8 +185,15 @@ class CodePannel(GameObj):
                 self.data,
                 current_init_code,
             )
+            self.signature_help.update(
+                self.code,
+                self.active_line,
+                self.code[self.active_line].cursor_index,
+                self.data,
+            )
         else:
             self.completer.hide()
+            self.signature_help.hide()
 
         mouse_pos = self.sub.local_mouse_pos().to_int()
         if 0 <= mouse_pos[0] < self.size.x and 0 <= mouse_pos[1] < self.size.y:
@@ -485,6 +499,11 @@ class CodePannel(GameObj):
 
         if self.code and self.code[self.active_line].active:
             self.completer.render(
+                self.sub.screen,
+                self.code[self.active_line],
+                (self.size.x, self.size.y),
+            )
+            self.signature_help.render(
                 self.sub.screen,
                 self.code[self.active_line],
                 (self.size.x, self.size.y),
