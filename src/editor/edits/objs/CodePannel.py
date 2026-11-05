@@ -216,7 +216,11 @@ class CodePannel(GameObj):
         self.refresh_errors()
 
     def refresh_errors(self):
-        error_map = self.errors.update([line._code for line in self.code])
+        error_map = self.errors.update(
+            [line._code for line in self.code],
+            self.data,
+            self.func,
+        )
         for index, line in enumerate(self.code):
             line.error = error_map.get(index)
 
