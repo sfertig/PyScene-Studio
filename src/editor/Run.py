@@ -45,7 +45,7 @@ def RunEditor(project_name, new=False):
         if Keys.is_pressed(Keys.f1) or (Keys.is_held(Keys.control) and Keys.is_pressed(Keys.s)): Game.SAVE = True
         Game.Tick()
         w.update()
-        if Keys.is_held(Keys.shift) and Keys.is_pressed(Keys.escape): Game.quit() #debug / developement exit
+        #if Keys.is_held(Keys.shift) and Keys.is_pressed(Keys.escape): Game.quit() #debug / developement exit
         if Game.BREAK: break
 
         #f6 build
@@ -147,15 +147,21 @@ def update_project_files(name):
     for scene_name in os.listdir(p+"scenes/"):
         if not scene_name.endswith(".json"): continue
         with open(p+"scenes/"+scene_name, "r") as f: data = json.load(f)
+        had_dirty_flag = "dirty" in data
         data = update_dict(data, DEFAULTSCENE.copy())
-        with open(p+"scenes/"+scene_name, "w") as f: json.dump(data, f, indent=4)
+        if not had_dirty_flag:
+            data["dirty"] = True
+        save_source_json(data, p+"scenes/"+scene_name)
 
     #objects
     for object_name in os.listdir(p+"objects/"):
         if not object_name.endswith(".json"): continue
         with open(p+"objects/"+object_name, "r") as f: data = json.load(f)
+        had_dirty_flag = "dirty" in data
         data = update_dict(data, DEFAULTOBJECT.copy())
-        with open(p+"objects/"+object_name, "w") as f: json.dump(data, f, indent=4)
+        if not had_dirty_flag:
+            data["dirty"] = True
+        save_source_json(data, p+"objects/"+object_name)
 
 def update_dict(old, new):
     for k, v in new.items():

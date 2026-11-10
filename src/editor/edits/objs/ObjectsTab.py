@@ -33,7 +33,8 @@ class ObjectsTabEdit(GameObj):
 
     def save(self):
         self.center.save()
-        with open(get_save_dir_path()+f"/{Game.project}/objects/{self.name}.json", "w") as f: json.dump(self.data, f, indent=4)
+        path = get_save_dir_path()+f"/{Game.project}/objects/{self.name}.json"
+        save_source_json(self.data, path)
 
     def update(self):
         self.left.update()
@@ -49,4 +50,3 @@ class ObjectsTabEdit(GameObj):
         self.center.render()
 
         self.sub.render()
-

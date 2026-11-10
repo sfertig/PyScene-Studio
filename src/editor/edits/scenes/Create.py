@@ -70,16 +70,23 @@ class Center_Surface(GameObj):
         #load data
         with open(get_save_dir_path()+f"/{Game.project}/objects/{name}.json", "r") as f:
             data = json.load(f)
-        self.create(name, name, data["functions"]["__init__"]["args"])
+        self.create(
+            name,
+            name,
+            data["functions"]["__init__"]["args"],
+            data.get("variables", {}).get("pos"),
+        )
     def _gen(self, name):
         self.create(name, name, getattr(PySceneObjectVarDef, name))
 
-    def create(self, name, _type: str, data: list[dict]):
+    def create(self, name, _type: str, data: list[dict], default_pos=None):
         self.DONE = True
         name = self.find_name(name)
         i = {"obj_type": _type, "variables": {}}
         for _i in data:
             i["variables"][_i["name"]] = _i["default"]
+        if default_pos is not None and "pos" not in i["variables"]:
+            i["variables"]["pos"] = list(default_pos)
         if _type == "Tilemap":
             i["variables"]["name"] = name
         self.data[name] = i.copy()
@@ -170,4 +177,3 @@ class PySceneObjs(GameObj):
             obj.render()
 
         self.sub.render()
-

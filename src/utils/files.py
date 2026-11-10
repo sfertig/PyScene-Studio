@@ -70,6 +70,22 @@ def get_project_asset_definitions(project_path: str, input_type: str) -> list[di
         if definition.get("type") == definition_type
     ]
 
+def save_source_json(data: dict, path: str) -> None:
+    current_source = {key: value for key, value in data.items() if key != "dirty"}
+    previous_source = None
+    if os.path.isfile(path):
+        with open(path, "r") as f:
+            previous_data = json.load(f)
+        previous_source = {
+            key: value for key, value in previous_data.items() if key != "dirty"
+        }
+
+    if previous_source != current_source:
+        data["dirty"] = True
+
+    with open(path, "w") as f:
+        json.dump(data, f, indent=4)
+
 def init_save_dir():
     
     path = get_save_dir_path()
@@ -98,6 +114,9 @@ def check_name(text):
 DEFAULTPROJECT = {
   "project_name": "__name__",
   "version": "0.0.1",
+  "export": {
+    "windows_windowed": True
+  },
   "window": {
     "width": 640,
     "height": 360,
@@ -106,6 +125,7 @@ DEFAULTPROJECT = {
     "bg_color": "darkblue",
     "title": "__pyscene_default__"
   },
+  "include_splashscreen": True,
   "main_scene": "scenes/main.json" #prob will never change
 }
 

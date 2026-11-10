@@ -81,7 +81,8 @@ class VisualSceneTabEdit(GameObj):
     def save(self):
         self.objs.save()
         self.script.save()
-        with open(get_save_dir_path()+f"/{Game.project}/scenes/{self.name}.json", "w") as f: json.dump(self.data, f, indent=4)
+        path = get_save_dir_path()+f"/{Game.project}/scenes/{self.name}.json"
+        save_source_json(self.data, path)
 
     def update(self):
         self.mode_btn.update()

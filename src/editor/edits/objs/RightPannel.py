@@ -68,8 +68,7 @@ def remove_scene_object_argument(project, object_type, argument_name):
                     changed = True
 
         if changed:
-            with open(scene_path, "w") as f:
-                json.dump(scene_data, f, indent=4)
+            save_source_json(scene_data, scene_path)
 
 
 class RightPannel(GameObj):
@@ -199,8 +198,7 @@ class Arguments(GameObj):
             "objects",
             f"{object_type}.json",
         )
-        with open(object_path, "w") as f:
-            json.dump(self.data, f, indent=4)
+        save_source_json(self.data, object_path)
 
     def update(self):
         self.input.update()

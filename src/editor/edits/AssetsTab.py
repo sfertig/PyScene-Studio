@@ -39,6 +39,8 @@ class AssetsTabEdit(GameObj):
 
         self.title = self.child(Text(Assets.get_font("default-35"), "Project Assets", "white", Vector2D(10, 5), "topleft", visible=False))
         self.import_button = btn(10, 45, 170, 35, "Import Files", self.sub)
+        self.use_system_font = False
+        self.font_source_button = btn(190, 45, 210, 35, "Use System Default", self.sub)
         self.name_input = self.child(TextInput(10, 105, 220, 35, Assets.get_font("default-25"), "", self.sub))
         self.selected_file = None
         self.asset_type = "image"
@@ -210,21 +212,27 @@ class AssetsTabEdit(GameObj):
         name = self.name_input.text.text.strip()
         if not name.isidentifier():
             raise ValueError("Asset name must be a valid Python identifier.")
-        if not self.selected_file or self.selected_file not in self.manifest["files"]:
-            raise ValueError("Select an imported asset file first.")
         if any(definition["name"] == name for definition in self.manifest["definitions"]):
             raise ValueError(f"An asset named {name!r} already exists.")
 
-        extension = os.path.splitext(self.selected_file)[1].lower()
-        if extension not in ASSET_EXTENSIONS[self.asset_type if self.asset_type in ("image", "font", "sound") else "image"]:
-            raise ValueError(f"{self.selected_file} is not a supported {self.asset_type} source.")
+        system_default_font = self.asset_type == "font" and self.use_system_font
+        if not system_default_font:
+            if not self.selected_file or self.selected_file not in self.manifest["files"]:
+                raise ValueError("Select an imported asset file first.")
+
+            extension = os.path.splitext(self.selected_file)[1].lower()
+            if extension not in ASSET_EXTENSIONS[self.asset_type if self.asset_type in ("image", "font", "sound") else "image"]:
+                raise ValueError(f"{self.selected_file} is not a supported {self.asset_type} source.")
 
         definition = {
             "name": name,
             "type": self.asset_type,
-            "file": self.selected_file,
             "options": self._make_options(),
         }
+        if system_default_font:
+            definition["source"] = "system_default"
+        else:
+            definition["file"] = self.selected_file
         self.manifest["definitions"].append(definition)
         self._save_manifest()
         self.status.set_text(f"Added {self.asset_type}: {name}")
@@ -295,6 +303,15 @@ class AssetsTabEdit(GameObj):
             if button.pressed and self.asset_type != asset_type:
                 self._set_type(asset_type)
 
+        if self.asset_type == "font":
+            self.font_source_button.update()
+            if self.font_source_button.pressed:
+                self.use_system_font = not self.use_system_font
+                label = "Use Imported Font" if self.use_system_font else "Use System Default"
+                self.font_source_button.text.set_text(label)
+                source = "system default" if self.use_system_font else "imported file"
+                self.status.set_text(f"Font source: {source}.")
+
         self.name_input.update()
         for _, field, _ in self.fields:
             field.update()
@@ -350,6 +367,8 @@ class AssetsTabEdit(GameObj):
         self.title.render_to(self.sub.screen)
         pygame.draw.line(self.sub.screen, "black", (5, 38), (self.size.x - 5, 38))
         self.import_button.render()
+        if self.asset_type == "font":
+            self.font_source_button.render()
         self.name_input.render()
         for asset_type, button in self.type_buttons:
             button.color = Colors["pannel"] if asset_type == self.asset_type else Colors["bg"]
@@ -389,7 +408,12 @@ class AssetsTabEdit(GameObj):
         for index, (definition, button) in enumerate(zip(self.definitions, self.definition_delete_buttons)):
             y = 375 + index * 36 - self.definition_scroll
             if 350 <= y < self.size.y:
-                details = f"{definition['name']}  [{definition['type']}]  <- {definition['file']}"
+                source = (
+                    "System default"
+                    if definition.get("source") == "system_default"
+                    else definition.get("file", "")
+                )
+                details = f"{definition['name']}  [{definition['type']}]  <- {source}"
                 self.sub.screen.blit(Assets.get_font("default-25").render(details, True, "white"), (515, y))
                 button.pos = Vector2D(self.size.x - 105, y - 3)
                 button.rect.topleft = button.pos.to_int()

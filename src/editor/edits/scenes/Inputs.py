@@ -36,7 +36,7 @@ class IntInput(_input):
         self.default = 0
 
     def get_value(self) -> int:
-        return int(format_int(self.text.text) or "0")
+        return int(float(format_int(self.text.text) or "0"))
 
     def update(self):
         if self.buffer < 0: self.buffer = 0
@@ -171,7 +171,19 @@ class ColorInput(_input):
         super().__init__(x, y, w, h, value, sub)
         self._r = pygame.Rect(self.r.topleft, (20, self.r.height))
         self.display = value
-        self.bar_rect = pygame.Rect(22, 0, w-22, h)
+        swatch_size = min(20, h)
+        swatch_gap = 2
+        swatches_width = swatch_size * 2 + swatch_gap
+        self.bar_rect = pygame.Rect(22, 0, max(1, w - 22 - swatches_width - 4), h)
+        swatches_x = self.bar_rect.right + 4
+        swatches_y = (h - swatch_size) // 2
+        self.color_swatches = [
+            (pygame.Rect(swatches_x, swatches_y, swatch_size, swatch_size), [255, 255, 255]),
+            (
+                pygame.Rect(swatches_x + swatch_size + swatch_gap, swatches_y, swatch_size, swatch_size),
+                [0, 0, 0],
+            ),
+        ]
         self.gradient_surface = pygame.Surface((self.bar_rect.width, self.bar_rect.height))
         for x in range(self.bar_rect.width):
             hue = x / self.bar_rect.width  # Hue goes from 0.0 to 1.0
@@ -189,6 +201,12 @@ class ColorInput(_input):
         if self._rect.collidepoint(mpos):
             #set display to color at mouse pos
             pos = self.sub.local_mouse_pos().to_int()
+            for swatch_rect, color in self.color_swatches:
+                if swatch_rect.collidepoint(pos):
+                    self.display = color
+                    if Game.click:
+                        self.value = color.copy()
+                    return
             pos = (pos[0]-22, pos[1])
             if pos[0] < 0 or pos[0] >= self.bar_rect.width or pos[1] < 0 or pos[1] >= self.bar_rect.height:
                 return
@@ -203,6 +221,9 @@ class ColorInput(_input):
         pygame.draw.rect(self.sub.screen, self.display, self._r)
         #pygame.draw.rect(self.sub.screen, Colors["b"], self.r, self.w)
         self.sub.screen.blit(self.gradient_surface, self.bar_rect.topleft)
+        for swatch_rect, color in self.color_swatches:
+            pygame.draw.rect(self.sub.screen, color, swatch_rect)
+            pygame.draw.rect(self.sub.screen, Colors["b"], swatch_rect, 1)
         pygame.draw.line(self.sub.screen, Colors["b"], (20, 0), (20, self.bar_rect.height), 2)
 
         self.sub.render()

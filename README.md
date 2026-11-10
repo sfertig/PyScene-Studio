@@ -17,6 +17,12 @@ Install the runtime packages:
 python -m pip install PyScene pygame-ce
 ```
 
+To use the export options, install the corresponding build tools:
+
+```bash
+python -m pip install pyinstaller pygbag
+```
+
 ## Start the editor
 
 Clone or download this repository, open a terminal in its root folder, then run:
@@ -41,9 +47,27 @@ PyScene Studio projects directory. Project files are stored in
 5. Add source files and asset definitions in the **Assets** tab.
 6. Press **F5** to build and run the project, or **F6** to build without
    launching it.
+7. In **Settings**, choose a window background color or export a Windows or
+   web build.
 
 The editor saves project changes as you work. You can also save manually with
 **F1** or **Ctrl+S**.
+
+## Export
+
+The **Settings** tab includes a background color picker and export controls.
+Exports are copied to a uniquely named folder in your Downloads directory;
+temporary build files are removed when the export finishes.
+
+- **Windows** — builds a one-file `.exe` with PyInstaller. Windows exports
+  must be built on Windows. The **Use --windowed** checkbox controls whether
+  the executable hides its console window.
+- **Web** — generates an asyncio-based entry point and builds it with pygbag.
+  The resulting web files can be hosted as a static site; use a web server
+  rather than opening the page directly from the filesystem.
+
+Install PyInstaller, pygbag, and the project's runtime dependencies into the
+same Python environment used to launch the editor.
 
 ## Assets
 
@@ -74,7 +98,6 @@ files in `_python/`.
 | **Ctrl+A** | Add an object to the current scene |
 | **F5** | Build and run the project |
 | **F6** or **Ctrl+B** | Build the project |
-| **Shift+Esc** | Close the editor |
 | **F** (Visual Mode) | Recenter the camera |
 
 Buttons in the editor provide alternatives to the shortcuts where available.
