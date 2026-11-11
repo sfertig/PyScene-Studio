@@ -20,7 +20,7 @@ print("Loading PyScene")
 #os.system("python -m pip install --upgrade --no-cache-dir PyScene")
 #os.system("python -m pip install --upgrade --no-cache-dir pygame-ce")
 
-Game.version = "0.2.4"
+Game.version = "0.2.5"
 
 Assets.colors = {}
 

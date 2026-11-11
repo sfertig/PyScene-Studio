@@ -268,7 +268,6 @@ class TypesBox(GameObj):
         self.types = []
         for var in vars(_types):
             self.types.append(var)
-        print(self.types)
         self.index = self.types.index(self._value)
 
     def update(self):

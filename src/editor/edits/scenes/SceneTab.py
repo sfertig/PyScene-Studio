@@ -18,7 +18,6 @@ from ..objs.CodePannel import CodePannel
 
 class VisualSceneTabEdit(GameObj):
     def __init__(self, name):
-        print(name)
         super().__init__(Vector2D(Game._usableEdit.x, Game._usableEdit.y), 0)
         self.size = Vector2D(Game._usableEdit.width, Game._usableEdit.height)
         self.sub = SubScreen(self.pos.x, self.pos.y, self.size.x, self.size.y, Colors["bg"], Game.screen)
@@ -107,6 +106,9 @@ class VisualSceneTabEdit(GameObj):
             return
 
         self.visual_editor.update()
+        if self.visual_editor.needs_save:
+            self.save()
+            self.visual_editor.needs_save = False
 
         if self.objs.update():
             self.gen()

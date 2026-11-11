@@ -41,9 +41,11 @@ PyScene Studio projects directory. Project files are stored in
 2. Open the project and create or select a scene in **Tab Manager**.
 3. Use **+ Add Obj** to add PyScene objects or your own custom objects to the
    scene. Select an object to edit its properties.
-4. Arrange renderable objects in **Visual Mode**. Drag the background to pan
-   the view, drag an object to move it, and press **F** to recenter the camera.
-   Switch to **Script Mode** to edit scene functions directly.
+4. Arrange objects in **Visual Mode**. Use **Move** or **Scale** to choose a
+   tool. Move and scale snap to the grid by default; toggle snapping and grid
+   visibility in the viewport toolbar. Choose a grid size from the **Grid**
+   dropdown. Drag empty space to pan, scroll to zoom, and press **F** to center
+   the game view. Switch to **Script Mode** to edit scene functions directly.
 5. Add source files and asset definitions in the **Assets** tab.
 6. Press **F5** to build and run the project, or **F6** to build without
    launching it.
@@ -98,7 +100,10 @@ files in `_python/`.
 | **Ctrl+A** | Add an object to the current scene |
 | **F5** | Build and run the project |
 | **F6** or **Ctrl+B** | Build the project |
-| **F** (Visual Mode) | Recenter the camera |
+| **W / R** (Visual Mode) | Move / Scale tool |
+| **G / H** (Visual Mode) | Toggle grid snapping / grid visibility |
+| **[ / ]** (Visual Mode) | Decrease / increase grid size |
+| **F** (Visual Mode) | Center the game view |
 
 Buttons in the editor provide alternatives to the shortcuts where available.
 

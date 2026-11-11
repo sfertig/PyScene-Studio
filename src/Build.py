@@ -1,6 +1,7 @@
 from PyScene import *
 import os
 import json
+import math
 import shutil
 
 from src.utils.files import *
@@ -317,6 +318,22 @@ class Build:
                     arguments.append(repr(value))
             args = ", ".join(arguments)
             data += f"        self.{obj} = {_type}({args})\n"
+            editor_scale = vars.get("editor_scale", 1.0)
+            if editor_scale != 1.0:
+                if (
+                    not isinstance(editor_scale, (int, float))
+                    or isinstance(editor_scale, bool)
+                    or not math.isfinite(editor_scale)
+                    or editor_scale <= 0
+                ):
+                    raise ValueError(
+                        f"Object {obj!r} has an invalid editor scale: {editor_scale!r}."
+                    )
+                data += (
+                    f"        if isinstance(getattr(self.{obj}, 'image', None), pygame.Surface):\n"
+                    f"            self.{obj}.image = pygame.transform.scale_by("
+                    f"self.{obj}.image, {editor_scale!r})\n"
+                )
             if custom_object:
                 position = vars.get(
                     "pos",

@@ -28,13 +28,32 @@ class VisualEditor(GameObj):
         self.preview_surface = None
         self.preview_surface_size = None
         self.preview_variables = {}
+        self.preview_object_names = {}
+        self.preview_original_images = {}
         self.preview_signature = None
         self.preview_custom_definitions = {}
         self.preview_asset_definitions = []
         self.preview_asset_cache = {}
         self.dragged_object = None
         self.dragged_variables = None
+        self.drag_mode = None
+        self.drag_changed = False
+        self.drag_total = [0.0, 0.0]
+        self.drag_applied = [0.0, 0.0]
+        self.drag_anchor = [0.0, 0.0]
+        self.drag_start_size = None
+        self.drag_start_scale = 1.0
+        self.selected_name = None
+        self.tool = "Move"
+        self.snap_enabled = True
+        self.grid_visible = True
+        self.needs_save = False
+        self.grid_sizes = (8, 16, 32, 64)
+        self.grid_index = self.grid_sizes.index(self.GridSize)
+        self.grid_dropdown_open = False
         self.axis_font = pygame.font.Font(None, 18)
+        self.toolbar_font = pygame.font.Font(None, 20)
+        self.toolbar_rects = {}
 
         #load game bg
         with open(get_save_dir_path()+f"/{Game.project}/project.json", "r") as f:
@@ -42,6 +61,263 @@ class VisualEditor(GameObj):
 
         self.game_size = Vector2D(game_data["window"]["width"], game_data["window"]["height"])
         self.sub = SubScreen(rect.x, rect.y, rect.width, rect.height, game_data["window"]["bg_color"], sub.screen, sub)
+        self._layout_toolbar()
+
+    def _layout_toolbar(self):
+        x = 8
+        y = 8
+        for label, width in (
+            ("Move", 52),
+            ("Scale", 52),
+            ("Snap", 64),
+            ("Lines", 62),
+            ("Grid", 76),
+        ):
+            self.toolbar_rects[label] = pygame.Rect(x, y, width, 26)
+            x += width + 4
+
+    def _handle_toolbar_click(self, position):
+        for label, rect in self.toolbar_rects.items():
+            if not rect.collidepoint(position):
+                continue
+            if label in ("Move", "Scale"):
+                self.tool = label
+            elif label == "Snap":
+                self.snap_enabled = not self.snap_enabled
+            elif label == "Lines":
+                self.grid_visible = not self.grid_visible
+            else:
+                self.grid_dropdown_open = not self.grid_dropdown_open
+            return True
+        return False
+
+    def _grid_dropdown_rect(self):
+        button_rect = self.toolbar_rects["Grid"]
+        return pygame.Rect(
+            button_rect.x,
+            button_rect.bottom,
+            button_rect.width,
+            len(self.grid_sizes) * 24,
+        )
+
+    def _handle_grid_dropdown_click(self, position):
+        if not self.grid_dropdown_open:
+            return False
+        dropdown_rect = self._grid_dropdown_rect()
+        if dropdown_rect.collidepoint(position):
+            option_index = (position[1] - dropdown_rect.y) // 24
+            self.grid_index = option_index
+            self.GridSize = self.grid_sizes[option_index]
+            self.grid_dropdown_open = False
+            return True
+        self.grid_dropdown_open = False
+        return False
+
+    def _object_name(self, obj):
+        return self.preview_object_names.get(id(obj))
+
+    def _selected_object(self):
+        for obj in self.preview_objects:
+            if self._object_name(obj) == self.selected_name:
+                return obj, self.preview_variables.get(id(obj))
+        return None, None
+
+    def _object_bounds(self, obj, variables):
+        rect = getattr(obj, "rect", None)
+        if isinstance(rect, pygame.Rect):
+            return rect.copy()
+
+        pos = getattr(obj, "pos", None)
+        if not isinstance(pos, Vector2D):
+            position = variables.get("pos")
+            if (
+                isinstance(position, (list, tuple))
+                and len(position) >= 2
+                and all(self._is_position_number(value) for value in position[:2])
+            ):
+                pos = Vector2D(*position[:2])
+            elif all(self._is_position_number(variables.get(axis)) for axis in ("x", "y")):
+                pos = Vector2D(variables["x"], variables["y"])
+            elif all(self._is_position_number(variables.get(axis)) for axis in ("x1", "y1")):
+                pos = Vector2D(variables["x1"], variables["y1"])
+
+        if all(self._is_position_number(variables.get(axis)) for axis in ("x2", "y2")):
+            x1 = variables.get("x1", pos.x if isinstance(pos, Vector2D) else 0)
+            y1 = variables.get("y1", pos.y if isinstance(pos, Vector2D) else 0)
+            return pygame.Rect(
+                round(min(x1, variables["x2"])),
+                round(min(y1, variables["y2"])),
+                max(1, round(abs(variables["x2"] - x1))),
+                max(1, round(abs(variables["y2"] - y1))),
+            )
+
+        if not isinstance(pos, Vector2D):
+            return None
+
+        if self._is_position_number(variables.get("r")):
+            radius = max(1, int(variables["r"]))
+            return pygame.Rect(pos.x - radius, pos.y - radius, radius * 2, radius * 2)
+
+        image = getattr(obj, "image", None)
+        if isinstance(image, pygame.Surface):
+            return pygame.Rect(pos.to_int(), image.get_size())
+
+        size = getattr(obj, "dim", None)
+        if isinstance(size, Vector2D):
+            return pygame.Rect(pos.to_int(), size.to_int())
+
+        if all(self._is_position_number(variables.get(axis)) for axis in ("w", "h")):
+            return pygame.Rect(pos.to_int(), (max(1, variables["w"]), max(1, variables["h"])))
+        return pygame.Rect(pos.to_int(), (16, 16))
+
+    def _scale_kind(self, obj, variables):
+        if all(self._is_position_number(variables.get(key)) for key in ("w", "h")):
+            return "rect"
+        if self._is_position_number(variables.get("r")):
+            return "circle"
+        if (
+            isinstance(getattr(obj, "image", None), pygame.Surface)
+            and not isinstance(obj, PyScene.Animation)
+        ):
+            return "image"
+        return None
+
+    def _selection_handle_rect(self):
+        obj, variables = self._selected_object()
+        if obj is None or variables is None or self._scale_kind(obj, variables) is None:
+            return None
+        bounds = self._object_bounds(obj, variables)
+        if bounds is None:
+            return None
+        scale_x, scale_y = self._view_scale()
+        right = (bounds.right - Game.cam.pos.x) * scale_x
+        bottom = (bounds.bottom - Game.cam.pos.y) * scale_y
+        return pygame.Rect(round(right - 5), round(bottom - 5), 10, 10)
+
+    def _drag_anchor(self, variables):
+        position = variables.get("pos")
+        if (
+            isinstance(position, (list, tuple))
+            and len(position) >= 2
+            and all(self._is_position_number(value) for value in position[:2])
+        ):
+            return [float(position[0]), float(position[1])]
+        for x_key, y_key in (("x", "y"), ("x1", "y1")):
+            if all(self._is_position_number(variables.get(key)) for key in (x_key, y_key)):
+                return [float(variables[x_key]), float(variables[y_key])]
+        return [0.0, 0.0]
+
+    def _apply_move_drag(self, dx, dy):
+        self.drag_total[0] += dx
+        self.drag_total[1] += dy
+        target = list(self.drag_total)
+        if self.snap_enabled:
+            target = [
+                round((self.drag_anchor[axis] + target[axis]) / self.GridSize) * self.GridSize
+                - self.drag_anchor[axis]
+                for axis in (0, 1)
+            ]
+        delta = [target[0] - self.drag_applied[0], target[1] - self.drag_applied[1]]
+        if delta != [0, 0]:
+            self._move_object(
+                self.dragged_object,
+                self.dragged_variables,
+                delta[0],
+                delta[1],
+            )
+            self.drag_applied = target
+            self.drag_changed = True
+
+    def _start_scale_drag(self, obj, variables):
+        self.drag_mode = "scale"
+        self.dragged_object = obj
+        self.dragged_variables = variables
+        self.drag_total = [0.0, 0.0]
+        self.drag_anchor = self._drag_anchor(variables)
+        self.drag_start_size = None
+        if self._scale_kind(obj, variables) == "rect":
+            self.drag_start_size = (variables["w"], variables["h"])
+        elif self._scale_kind(obj, variables) == "circle":
+            self.drag_start_size = variables["r"]
+        else:
+            self.drag_start_scale = variables.get("editor_scale", 1.0)
+            if (
+                not self._is_position_number(self.drag_start_scale)
+                or not math.isfinite(self.drag_start_scale)
+                or self.drag_start_scale <= 0
+            ):
+                raise ValueError(
+                    f"Object {self._object_name(obj)!r} has an invalid editor scale."
+                )
+        self.drag_changed = False
+
+    def _apply_scale_drag(self, dx, dy):
+        self.drag_total[0] += dx
+        self.drag_total[1] += dy
+        kind = self._scale_kind(self.dragged_object, self.dragged_variables)
+        variables = self.dragged_variables
+        if kind == "rect":
+            start_w, start_h = self.drag_start_size
+            width = start_w + self.drag_total[0]
+            height = start_h + self.drag_total[1]
+            if self.snap_enabled:
+                width = round(
+                    (self.drag_anchor[0] + width) / self.GridSize
+                ) * self.GridSize - self.drag_anchor[0]
+                height = round(
+                    (self.drag_anchor[1] + height) / self.GridSize
+                ) * self.GridSize - self.drag_anchor[1]
+            width = max(1, round(width))
+            height = max(1, round(height))
+            changed = width != variables["w"] or height != variables["h"]
+            variables["w"], variables["h"] = width, height
+            if hasattr(self.dragged_object, "w"):
+                self.dragged_object.w = width
+            if hasattr(self.dragged_object, "h"):
+                self.dragged_object.h = height
+            if hasattr(self.dragged_object, "dim"):
+                self.dragged_object.dim = Vector2D(width, height)
+            rect = getattr(self.dragged_object, "rect", None)
+            if isinstance(rect, pygame.Rect):
+                rect.size = (width, height)
+        elif kind == "circle":
+            radius = self.drag_start_size + (self.drag_total[0] + self.drag_total[1]) / 2
+            if self.snap_enabled:
+                radius = (
+                    round((self.drag_anchor[0] + radius) / self.GridSize)
+                    * self.GridSize
+                    - self.drag_anchor[0]
+                )
+            radius = max(1, round(radius))
+            changed = radius != variables["r"]
+            variables["r"] = radius
+            self.dragged_object.radius = radius
+        elif kind == "image":
+            original = self.preview_original_images[id(self.dragged_object)]
+            width = max(1, original.get_width())
+            scaled_width = width * self.drag_start_scale + self.drag_total[0]
+            if self.snap_enabled:
+                scaled_width = (
+                    round((self.drag_anchor[0] + scaled_width) / self.GridSize)
+                    * self.GridSize
+                    - self.drag_anchor[0]
+                )
+            scale = max(0.1, scaled_width / width)
+            changed = scale != variables.get("editor_scale", 1.0)
+            variables["editor_scale"] = scale
+            self.dragged_object.image = pygame.transform.scale_by(original, scale)
+        else:
+            return
+        if changed:
+            self.drag_changed = True
+            self.preview_signature = json.dumps(
+                {
+                    "objects": self.data["objects"],
+                    "custom_objects": self.preview_custom_definitions,
+                    "assets": self.preview_asset_definitions,
+                },
+                sort_keys=True,
+            )
 
     def _load_preview_asset(self, input_type, name):
         cache_key = (input_type, name)
@@ -234,6 +510,8 @@ class VisualEditor(GameObj):
         self.preview_objects = []
         self.preview_render_methods = {}
         self.preview_variables = {}
+        self.preview_object_names = {}
+        self.preview_original_images = {}
         self.preview_asset_definitions = asset_definitions
         self.preview_asset_cache = {}
         queue_length = len(Game.queue_creation)
@@ -241,15 +519,15 @@ class VisualEditor(GameObj):
         always_global = Game.always_global
         Game.always_global = True
         try:
-            for object_data in self.data["objects"].values():
+            for object_name, object_data in self.data["objects"].items():
                 obj_type = object_data["obj_type"]
                 obj_class = getattr(PyScene, obj_type, None)
                 render_method = "render_to"
+                variables = object_data["variables"]
                 if obj_class is not None:
                     if not callable(getattr(obj_class, "render_to", None)) and obj_type != "Tilemap":
                         continue
                     arg_definitions = getattr(PySceneObjectVarDef, obj_type)
-                    variables = object_data["variables"]
                     if not self._has_preview_assets(arg_definitions, variables):
                         continue
                     obj_args = [
@@ -278,7 +556,7 @@ class VisualEditor(GameObj):
                     source += f"\nclass {obj_type}(GameObj):\n"
 
                     init_args = functions["__init__"]["args"]
-                    scene_variables = object_data["variables"]
+                    scene_variables = variables
                     if not self._has_preview_assets(init_args, scene_variables):
                         continue
                     arg_names = [arg["name"] for arg in init_args]
@@ -333,9 +611,19 @@ class VisualEditor(GameObj):
                     or obj_type == "Tilemap"
                     or render_method == "render"
                 ):
+                    image = getattr(obj, "image", None)
+                    if (
+                        isinstance(image, pygame.Surface)
+                        and not isinstance(obj, PyScene.Animation)
+                    ):
+                        self.preview_original_images[id(obj)] = image.copy()
+                        scale = variables.get("editor_scale", 1.0)
+                        if self._is_position_number(scale) and scale > 0 and scale != 1.0:
+                            obj.image = pygame.transform.scale_by(image, scale)
                     self.preview_objects.append(obj)
                     self.preview_render_methods[id(obj)] = render_method
                     self.preview_variables[id(obj)] = object_data["variables"]
+                    self.preview_object_names[id(obj)] = object_name
         finally:
             del Game.queue_creation[queue_length:]
             Game.id = game_id
@@ -344,6 +632,8 @@ class VisualEditor(GameObj):
         self.preview_objects.sort(key=lambda obj: getattr(obj, "z_index", 0))
         self.preview_custom_definitions = custom_definitions
         self.preview_signature = signature
+        if self.selected_name not in self.data["objects"]:
+            self.selected_name = None
 
     @staticmethod
     def _is_position_number(value):
@@ -572,38 +862,88 @@ class VisualEditor(GameObj):
 
         for event in Game.events:
             scale_x, scale_y = self._view_scale()
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_f:
-                self.center_camera()
+            mouse_screen_pos = pygame.mouse.get_pos()
+            pointer_pos = Vector2D(*mouse_screen_pos) - absolute_pos
+            pointer_in_viewport = viewport.collidepoint(pointer_pos.to_int())
+            if event.type == pygame.KEYDOWN and pointer_in_viewport:
+                if event.key == pygame.K_f:
+                    self.center_camera()
+                elif event.key == pygame.K_w:
+                    self.tool = "Move"
+                elif event.key == pygame.K_r:
+                    self.tool = "Scale"
+                elif event.key == pygame.K_g:
+                    self.snap_enabled = not self.snap_enabled
+                elif event.key == pygame.K_h:
+                    self.grid_visible = not self.grid_visible
+                elif event.key in (pygame.K_LEFTBRACKET, pygame.K_RIGHTBRACKET):
+                    direction = -1 if event.key == pygame.K_LEFTBRACKET else 1
+                    self.grid_index = (self.grid_index + direction) % len(self.grid_sizes)
+                    self.GridSize = self.grid_sizes[self.grid_index]
             elif event.type == pygame.MOUSEWHEEL and event.y:
-                mouse_screen_pos = pygame.mouse.get_pos()
-                mouse_pos = Vector2D(*mouse_screen_pos) - absolute_pos
-                if viewport.collidepoint(mouse_pos.to_int()):
-                    self._zoom_at(mouse_pos, event.y)
+                if pointer_in_viewport:
+                    self._zoom_at(pointer_pos, event.y)
             elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mouse_pos = Vector2D(*event.pos) - absolute_pos
                 if viewport.collidepoint(mouse_pos.to_int()):
+                    if self._handle_grid_dropdown_click(mouse_pos.to_int()):
+                        continue
+                    if self._handle_toolbar_click(mouse_pos.to_int()):
+                        continue
                     world_pos = Vector2D(
                         Game.cam.pos.x + mouse_pos.x / scale_x,
                         Game.cam.pos.y + mouse_pos.y / scale_y,
                     )
-                    self.dragged_object, self.dragged_variables = self._find_draggable_object(world_pos)
-                    self.dragging = self.dragged_object is None
+                    handle = self._selection_handle_rect()
+                    selected_object, selected_variables = self._selected_object()
+                    if (
+                        self.tool == "Scale"
+                        and selected_object is not None
+                        and handle is not None
+                        and handle.collidepoint(mouse_pos.to_int())
+                    ):
+                        self._start_scale_drag(selected_object, selected_variables)
+                    else:
+                        obj, variables = self._find_draggable_object(world_pos)
+                        if obj is None:
+                            self.selected_name = None
+                            self.drag_mode = "pan"
+                        else:
+                            self.selected_name = self._object_name(obj)
+                            if self.tool == "Move":
+                                self.drag_mode = "move"
+                                self.dragged_object = obj
+                                self.dragged_variables = variables
+                                self.drag_anchor = self._drag_anchor(variables)
+                                self.drag_total = [0.0, 0.0]
+                                self.drag_applied = [0.0, 0.0]
+                                self.drag_changed = False
+                            elif self.tool == "Scale":
+                                handle = self._selection_handle_rect()
+                                if handle is not None and handle.collidepoint(mouse_pos.to_int()):
+                                    self._start_scale_drag(obj, variables)
+                            else:
+                                self.drag_mode = None
+                    self.dragging = self.drag_mode == "pan"
                     self.drag_remainder = [0.0, 0.0]
-            elif event.type == pygame.MOUSEMOTION and self.dragging:
+                else:
+                    self.grid_dropdown_open = False
+            elif event.type == pygame.MOUSEMOTION and self.drag_mode == "pan":
                 Game.cam.pos.x -= event.rel[0] / scale_x
                 Game.cam.pos.y -= event.rel[1] / scale_y
-            elif event.type == pygame.MOUSEMOTION and self.dragged_object is not None:
-                self._move_object(
-                    self.dragged_object,
-                    self.dragged_variables,
-                    event.rel[0] / scale_x,
-                    event.rel[1] / scale_y,
-                )
+            elif event.type == pygame.MOUSEMOTION and self.drag_mode == "move":
+                self._apply_move_drag(event.rel[0] / scale_x, event.rel[1] / scale_y)
+            elif event.type == pygame.MOUSEMOTION and self.drag_mode == "scale":
+                self._apply_scale_drag(event.rel[0] / scale_x, event.rel[1] / scale_y)
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
+                if self.drag_changed:
+                    self.needs_save = True
+                self.drag_mode = None
                 self.dragging = False
                 self.dragged_object = None
                 self.dragged_variables = None
                 self.drag_remainder = [0.0, 0.0]
+                self.drag_changed = False
 
     def render(self):
         self.sub.clear()
@@ -616,16 +956,17 @@ class VisualEditor(GameObj):
         world_surface = self.preview_surface
         world_surface.fill((0, 0, 0, 0))
 
-        grid_color = Colors["pannel"]
-        grid_size = self.GridSize
+        if self.grid_visible:
+            grid_color = Colors["pannel"]
+            grid_size = self.GridSize
 
-        first_x = int(-Game.cam.pos.x % grid_size)
-        for x in range(first_x, world_width, grid_size):
-            pygame.draw.line(world_surface, grid_color, (x, 0), (x, world_height))
+            first_x = int(-Game.cam.pos.x % grid_size)
+            for x in range(first_x, world_width, grid_size):
+                pygame.draw.line(world_surface, grid_color, (x, 0), (x, world_height))
 
-        first_y = int(-Game.cam.pos.y % grid_size)
-        for y in range(first_y, world_height, grid_size):
-            pygame.draw.line(world_surface, grid_color, (0, y), (world_width, y))
+            first_y = int(-Game.cam.pos.y % grid_size)
+            for y in range(first_y, world_height, grid_size):
+                pygame.draw.line(world_surface, grid_color, (0, y), (world_width, y))
 
         for obj in self.preview_objects:
             if getattr(obj, "visible", True):
@@ -647,6 +988,24 @@ class VisualEditor(GameObj):
         scaled_surface = pygame.transform.scale(world_surface, self.sub.dim.to_int())
         self.sub.screen.blit(scaled_surface, (0, 0))
 
+        selected_object, selected_variables = self._selected_object()
+        if selected_object is not None and selected_variables is not None:
+            bounds = self._object_bounds(selected_object, selected_variables)
+            if bounds is not None:
+                scale_x, scale_y = self._view_scale()
+                selection_rect = pygame.Rect(
+                    round((bounds.x - Game.cam.pos.x) * scale_x),
+                    round((bounds.y - Game.cam.pos.y) * scale_y),
+                    max(1, round(bounds.width * scale_x)),
+                    max(1, round(bounds.height * scale_y)),
+                )
+                pygame.draw.rect(self.sub.screen, (95, 190, 255), selection_rect, 2)
+                if self._scale_kind(selected_object, selected_variables) is not None:
+                    handle = self._selection_handle_rect()
+                    if handle is not None:
+                        pygame.draw.rect(self.sub.screen, (245, 245, 245), handle)
+                        pygame.draw.rect(self.sub.screen, (35, 90, 150), handle, 1)
+
         pygame.draw.rect(
             self.sub.screen,
             Colors["pannel"],
@@ -666,10 +1025,62 @@ class VisualEditor(GameObj):
             pygame.draw.line(self.sub.screen, y_axis_color, (axis_x, 0), (axis_x, self.rect.height), 2)
             self.sub.screen.blit(self.axis_font.render("Y", True, y_axis_color), (min(self.rect.width - 14, axis_x + 4), 2))
         zoom_label = self.axis_font.render(
-            f"{round(self.zoom * 100)}%  |  Scroll to zoom  |  F to center",
+            f"{round(self.zoom * 100)}%  |  F center  G snap  H grid  [ ] grid size",
             True,
             "white",
         )
-        self.sub.screen.blit(zoom_label, (8, 8))
+        self.sub.screen.blit(
+            zoom_label,
+            (max(8, self.rect.width - zoom_label.get_width() - 8), 38),
+        )
+
+        toolbar_labels = {
+            "Move": "Move",
+            "Scale": "Scale",
+            "Snap": "Snap ON" if self.snap_enabled else "Snap OFF",
+            "Lines": "Lines ON" if self.grid_visible else "Lines OFF",
+            "Grid": f"Grid {self.GridSize} v",
+        }
+        for label, rect in self.toolbar_rects.items():
+            active = label == self.tool or (
+                (label == "Snap" and self.snap_enabled)
+                or (label == "Lines" and self.grid_visible)
+            )
+            fill = (48, 98, 145) if active else Colors["bg"]
+            pygame.draw.rect(self.sub.screen, fill, rect)
+            pygame.draw.rect(self.sub.screen, (150, 165, 180), rect, 1)
+            text = self.toolbar_font.render(toolbar_labels[label], True, "white")
+            self.sub.screen.blit(text, text.get_rect(center=rect.center))
+
+        if self.grid_dropdown_open:
+            dropdown_rect = self._grid_dropdown_rect()
+            pygame.draw.rect(self.sub.screen, Colors["bg"], dropdown_rect)
+            pygame.draw.rect(self.sub.screen, (150, 165, 180), dropdown_rect, 1)
+            for index, grid_size in enumerate(self.grid_sizes):
+                option_rect = pygame.Rect(
+                    dropdown_rect.x,
+                    dropdown_rect.y + index * 24,
+                    dropdown_rect.width,
+                    24,
+                )
+                if index == self.grid_index:
+                    pygame.draw.rect(self.sub.screen, (48, 98, 145), option_rect)
+                option = self.toolbar_font.render(str(grid_size), True, "white")
+                self.sub.screen.blit(
+                    option,
+                    option.get_rect(center=option_rect.center),
+                )
+
+        selected_object, _ = self._selected_object()
+        if selected_object is not None:
+            selected_type = self.data["objects"][self.selected_name]["obj_type"]
+            status = f"{self.tool}: {self.selected_name} ({selected_type})"
+        else:
+            status = f"{self.tool}: no object selected"
+        max_status_width = max(0, self.rect.width - 16)
+        while status and self.axis_font.size(status)[0] > max_status_width:
+            status = status[:-1]
+        selected_label = self.axis_font.render(status, True, (150, 210, 255))
+        self.sub.screen.blit(selected_label, (8, self.rect.height - 22))
 
         self.sub.render()

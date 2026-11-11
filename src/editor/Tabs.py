@@ -208,12 +208,10 @@ class Settings_tab(Tab):
         self.obj.visible = False
 
     def on_active(self):
-        print("settings active")
         self.obj.visible = True
         self.obj._active = True
 
     def on_non_active(self):
-        print("settings non active")
         self.save()
         self.obj.visible = False
         self.obj._active = False
