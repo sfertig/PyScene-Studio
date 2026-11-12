@@ -42,18 +42,28 @@ PyScene Studio projects directory. Project files are stored in
 3. Use **+ Add Obj** to add PyScene objects or your own custom objects to the
    scene. Select an object to edit its properties.
 4. Arrange objects in **Visual Mode**. Use **Move** or **Scale** to choose a
-   tool. Move and scale snap to the grid by default; toggle snapping and grid
-   visibility in the viewport toolbar. Choose a grid size from the **Grid**
-   dropdown. Drag empty space to pan, scroll to zoom, and press **F** to center
-   the game view. Switch to **Script Mode** to edit scene functions directly.
-5. Add source files and asset definitions in the **Assets** tab.
+   tool. Move and scale snap to the grid by default; toggle grid and smart
+   snapping in the viewport toolbar. Choose a grid size from the **Grid**
+   dropdown. **Shift-click** objects to select a group; move or scale the
+   selection together. Use **Ctrl+D** or **Alt-drag** to duplicate. Arrow keys
+   nudge by one pixel; **Shift+Arrow** nudges by the current grid size.
+   Right-click for duplicate, delete, rename, and layer-order actions. Use
+   **Ctrl+Z**/**Ctrl+Y** to undo/redo scene object changes. Pan with the middle
+   mouse button or **Space+drag**, scroll to zoom, and press **F** to frame the
+   selection. **1/2/3** set 50%/100%/200% zoom. Switch to **Script Mode** to
+   edit scene functions directly.
+5. Search and reset properties in the inspector. Shift-click a group in the
+   viewport to edit shared properties. The **Assets** tab previews imported
+   images and animation frames and can play sound files.
 6. Press **F5** to build and run the project, or **F6** to build without
    launching it.
 7. In **Settings**, choose a window background color or export a Windows or
    web build.
 
-The editor saves project changes as you work. You can also save manually with
-**F1** or **Ctrl+S**.
+The editor saves project changes as you work. Scene tabs show their save state,
+autosave unsaved changes, and recover a newer autosave when reopened. You can
+also save manually with **F1** or **Ctrl+S**. When creating a scene, choose a
+blank, platformer, or menu/UI starter layout, or duplicate an existing scene.
 
 ## Export
 
@@ -102,8 +112,14 @@ files in `_python/`.
 | **F6** or **Ctrl+B** | Build the project |
 | **W / R** (Visual Mode) | Move / Scale tool |
 | **G / H** (Visual Mode) | Toggle grid snapping / grid visibility |
+| **Ctrl+D** or **Alt-drag** (Visual Mode) | Duplicate selection |
+| **Arrow keys / Shift+Arrow** (Visual Mode) | Nudge by one pixel / grid size |
 | **[ / ]** (Visual Mode) | Decrease / increase grid size |
-| **F** (Visual Mode) | Center the game view |
+| **Shift-click** (Visual Mode) | Add/remove objects from the selection |
+| **Middle-mouse or Space+drag** (Visual Mode) | Pan the viewport |
+| **1 / 2 / 3** (Visual Mode) | Set 50% / 100% / 200% zoom |
+| **Ctrl+Z / Ctrl+Y** (Visual Mode) | Undo / redo scene object changes |
+| **F** (Visual Mode) | Frame selection, or center the game view |
 
 Buttons in the editor provide alternatives to the shortcuts where available.
 

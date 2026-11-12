@@ -1,6 +1,8 @@
 from PyScene import *
 import pygame
 import json
+import copy
+import keyword
 
 from ...utils.load_assets import Colors
 from ...utils.files import *
@@ -55,31 +57,227 @@ class Create(GameObj):
         self._name_ = f"_{name}_"
         self.id = name
         self.name = self.child(TextInput(5, 50, self.size.x-10, 30, Assets.get_font("default-25"), "", self.sub))
+        self.scene_templates = (
+            "Empty",
+            "Platformer",
+            "Menu / UI",
+            "Duplicate Existing",
+        )
+        self.template_index = 0
+        self.template_button = btn(
+            5,
+            100,
+            self.size.x - 10,
+            32,
+            "Template: Empty",
+            self.sub,
+        )
+        self.source_scene_names = self._available_scene_names()
+        self.source_scene_index = 0
+        self.source_button = btn(
+            5,
+            145,
+            self.size.x - 10,
+            32,
+            "Source: main",
+            self.sub,
+        )
+        self._update_source_button()
+        self.status = self.child(
+            Text(
+                Assets.get_font("default-25"),
+                "",
+                (255, 150, 150),
+                Vector2D(5, 195),
+                "topleft",
+                visible=False,
+            )
+        )
         self.create = btn(self.size.x/2-50, self.size.y-50, 100, 50, "Create", self.sub, -1, 2, Colors["b"])
         self.child(self.create.text)
 
     def update(self):
         self.GEN = False
         self.name.update()
+        if self._name == "scene":
+            self.template_button.update()
+            if self.template_button.pressed:
+                self.template_index = (
+                    self.template_index + 1
+                ) % len(self.scene_templates)
+                self.template_button.text.set_text(
+                    f"Template: {self.scene_templates[self.template_index]}"
+                )
+            if self.scene_templates[self.template_index] == "Duplicate Existing":
+                self.source_button.update()
+                if self.source_button.pressed and self.source_scene_names:
+                    self.source_scene_index = (
+                        self.source_scene_index + 1
+                    ) % len(self.source_scene_names)
+                    self._update_source_button()
         self.create.update()
         if self.create.pressed:
             name = self.name.text.text
-            if self.check_exists(name): 
-                print(f"[TabManager] - {self._name} Already Exists")
+            if not name:
+                self.status.set_text("Enter a name.")
                 return
-            if name == "": return
-            self._create(name)
+            if not name.isidentifier() or keyword.iskeyword(name):
+                self.status.set_text("Use a valid Python identifier.")
+                return
+            try:
+                if self.check_exists(name):
+                    self.status.set_text(f"{self._name.title()} already exists.")
+                    return
+                self._create(name)
+            except (OSError, ValueError) as error:
+                self.status.set_text(str(error))
+
+    def _available_scene_names(self):
+        if self._name != "scene":
+            return []
+        scenes_path = os.path.join(
+            get_save_dir_path(),
+            Game.project,
+            "scenes",
+        )
+        if not os.path.isdir(scenes_path):
+            return []
+        return sorted(
+            os.path.splitext(filename)[0]
+            for filename in os.listdir(scenes_path)
+            if filename.endswith(".json")
+        )
+
+    def _update_source_button(self):
+        if self.source_scene_names:
+            source = self.source_scene_names[self.source_scene_index]
+            self.source_button.text.set_text(f"Source: {source}")
+
+    def _make_scene_template(self, name):
+        template = self.scene_templates[self.template_index]
+        if template == "Duplicate Existing":
+            self.source_scene_names = self._available_scene_names()
+            if not self.source_scene_names:
+                raise ValueError("There are no scenes available to duplicate.")
+            self.source_scene_index %= len(self.source_scene_names)
+            source_path = os.path.join(
+                get_save_dir_path(),
+                Game.project,
+                "scenes",
+                f"{self.source_scene_names[self.source_scene_index]}.json",
+            )
+            with open(source_path, "r") as f:
+                data = json.load(f)
+            data = copy.deepcopy(data)
+            data["name"] = name
+            data["dirty"] = False
+            return data
+
+        data = copy.deepcopy(DEFAULTSCENE)
+        data["name"] = name
+        if template == "Empty":
+            return data
+
+        project_path = os.path.join(get_save_dir_path(), Game.project)
+        with open(os.path.join(project_path, "project.json"), "r") as f:
+            project = json.load(f)
+        width = project["window"]["width"]
+        height = project["window"]["height"]
+
+        def rectangle(x, y, w, h, color, z_index):
+            return {
+                "obj_type": "Rect",
+                "variables": {
+                    "x": x,
+                    "y": y,
+                    "w": w,
+                    "h": h,
+                    "color": color,
+                    "width": 0,
+                    "z_index": z_index,
+                    "active": True,
+                    "visible": True,
+                    "offset": True,
+                    "Global": False,
+                },
+            }
+
+        if template == "Platformer":
+            data["objects"] = {
+                "Ground": rectangle(
+                    0,
+                    max(0, height - 32),
+                    width,
+                    32,
+                    [70, 180, 110],
+                    0,
+                ),
+                "Player": rectangle(
+                    max(0, width // 8),
+                    max(0, height - 80),
+                    24,
+                    32,
+                    [80, 150, 255],
+                    1,
+                ),
+            }
+            data["functions"]["update"]["code"] = [
+                "# Add player movement and collision logic here.",
+                "pass",
+            ]
+        elif template == "Menu / UI":
+            data["objects"] = {
+                "Background": rectangle(
+                    0,
+                    0,
+                    width,
+                    height,
+                    [28, 34, 52],
+                    0,
+                ),
+                "MenuPanel": rectangle(
+                    width // 4,
+                    height // 5,
+                    width // 2,
+                    height * 3 // 5,
+                    [55, 68, 94],
+                    1,
+                ),
+                "StartButton": rectangle(
+                    width * 3 // 8,
+                    height // 2,
+                    width // 4,
+                    max(24, height // 9),
+                    [70, 150, 105],
+                    2,
+                ),
+            }
+            data["functions"]["update"]["code"] = [
+                "# Add button input and menu transitions here.",
+                "pass",
+            ]
+        return data
 
     def _create(self, name):
         #create file
-        if self._name == "scene": data = DEFAULTSCENE.copy()
-        else: data = DEFAULTOBJECT.copy()
+        if self._name == "scene":
+            data = self._make_scene_template(name)
+        else:
+            data = copy.deepcopy(DEFAULTOBJECT)
         data["name"] = name
-        with open(get_save_dir_path()+f"/{Game.project}/{self._name}s/{name}.json", "w") as f:
+        data["dirty"] = True
+        path = os.path.join(
+            get_save_dir_path(),
+            Game.project,
+            f"{self._name}s",
+            f"{name}.json",
+        )
+        with open(path, "w") as f:
             json.dump(data, f, indent=4)
             print(f"[TabManager] - {self._name} File Created: "+name)
         self.tabs.open_tab(name, self._name_, self.id)
         self.name.text.set_text("")
+        self.status.set_text("")
         self.GEN = True
 
 
@@ -98,6 +296,11 @@ class Create(GameObj):
         self.title.render_to(self.sub.screen)
         pygame.draw.line(self.screen, "black", (5, 35), (self.size.x-5, 35))
         self.name.render()
+        self.status.render_to(self.sub.screen)
+        if self._name == "scene":
+            self.template_button.render()
+            if self.scene_templates[self.template_index] == "Duplicate Existing":
+                self.source_button.render()
         self.create.render()
 
         self.sub.render()

@@ -2,6 +2,7 @@ import json
 import os
 import re
 import shutil
+import time
 import tkinter
 from tkinter import filedialog
 
@@ -59,6 +60,18 @@ class AssetsTabEdit(GameObj):
         self.status = self.child(Text(Assets.get_font("default-25"), "", "white", Vector2D(195, 175), "midleft", visible=False))
         self.file_scroll = 0
         self.definition_scroll = 0
+        self.preview_cache_key = None
+        self.preview_image = None
+        self.preview_definition = None
+        self.preview_error_key = None
+        self.preview_play_button = btn(
+            max(10, self.size.x - 180),
+            245,
+            160,
+            30,
+            "Play sound",
+            self.sub,
+        )
         self.refresh_lists()
 
     def _field_specs(self, asset_type=None):
@@ -293,10 +306,114 @@ class AssetsTabEdit(GameObj):
             message += f" Removed {len(removed_definitions)} definition(s)."
         self.status.set_text(message)
 
+    def _selected_asset_path(self):
+        if not self.selected_file:
+            return None
+        path = os.path.abspath(os.path.join(
+            self.assets_path,
+            self.selected_file.replace("/", os.sep),
+        ))
+        try:
+            contained = os.path.commonpath((os.path.abspath(self.assets_path), path)) == os.path.abspath(self.assets_path)
+        except ValueError:
+            contained = False
+        if not contained:
+            raise ValueError(
+                f"Asset path is outside the project assets directory: {self.selected_file!r}"
+            )
+        return path
+
+    def _load_selected_preview(self):
+        if not self.selected_file:
+            self.preview_cache_key = None
+            self.preview_image = None
+            self.preview_definition = None
+            return
+
+        definitions = [
+            definition for definition in self.definitions
+            if definition.get("file") == self.selected_file
+        ]
+        definition = next(
+            (item for item in definitions if item.get("type") == "animation"),
+            next(
+                (item for item in definitions if item.get("type") == "image"),
+                None,
+            ),
+        )
+        animation = (
+            definition is not None and definition.get("type") == "animation"
+        ) or (definition is None and self.asset_type == "animation")
+        frame_size = 16
+        if animation:
+            if definition is not None:
+                frame_size = definition.get("options", {}).get("frame_size", 16)
+            else:
+                field_values = {key: field.text.text for _, field, key in self.fields}
+                try:
+                    frame_size = int(field_values.get("frame_size", "16"))
+                except ValueError:
+                    frame_size = 16
+        key = json.dumps(
+            {
+                "file": self.selected_file,
+                "definition": definition,
+                "animation": animation,
+                "frame_size": frame_size,
+            },
+            sort_keys=True,
+        )
+        if key == self.preview_cache_key:
+            return
+
+        self.preview_cache_key = key
+        self.preview_image = None
+        self.preview_definition = definition
+        if os.path.splitext(self.selected_file)[1].lower() not in ASSET_EXTENSIONS["image"]:
+            return
+        try:
+            image = pygame.image.load(self._selected_asset_path()).convert_alpha()
+            options = definition.get("options", {}) if definition else {}
+            if options.get("rect") is not None and not animation:
+                image = image.subsurface(options["rect"]).copy()
+            self.preview_image = image
+            self.preview_error_key = None
+        except (OSError, ValueError, pygame.error) as error:
+            if self.preview_error_key != key:
+                self.status.set_text(f"Preview unavailable: {error}")
+                self.preview_error_key = key
+
+    def _play_selected_sound(self):
+        path = self._selected_asset_path()
+        if path is None:
+            return
+        try:
+            pygame.mixer.Sound(path).play()
+            self.status.set_text(f"Playing {os.path.basename(path)}.")
+        except (OSError, ValueError, pygame.error) as error:
+            self.status.set_text(f"Sound preview unavailable: {error}")
+
     def update(self):
         self.import_button.update()
         if self.import_button.pressed:
             self.import_files()
+
+        self.preview_play_button.pos.x = max(10, self.size.x - 180)
+        self.preview_play_button.rect.x = int(self.preview_play_button.pos.x)
+        self.preview_play_button.text.set_pos(
+            Vector2D(
+                self.preview_play_button.rect.centerx,
+                self.preview_play_button.rect.centery,
+            )
+        )
+        if (
+            self.selected_file
+            and os.path.splitext(self.selected_file)[1].lower()
+            in ASSET_EXTENSIONS["sound"]
+        ):
+            self.preview_play_button.update()
+            if self.preview_play_button.pressed:
+                self._play_selected_sound()
 
         for asset_type, button in self.type_buttons:
             button.update()
@@ -364,6 +481,7 @@ class AssetsTabEdit(GameObj):
 
     def render(self):
         self.sub.clear()
+        self._load_selected_preview()
         self.title.render_to(self.sub.screen)
         pygame.draw.line(self.sub.screen, "black", (5, 38), (self.size.x - 5, 38))
         self.import_button.render()
@@ -378,6 +496,87 @@ class AssetsTabEdit(GameObj):
             field.render()
         self.add_button.render()
         self.status.render_to(self.sub.screen)
+
+        preview_rect = pygame.Rect(max(10, self.size.x - 230), 45, 220, 180)
+        pygame.draw.rect(self.sub.screen, Colors["bg"], preview_rect)
+        pygame.draw.rect(self.sub.screen, (150, 165, 180), preview_rect, 1)
+        preview_title = "Asset preview"
+        if self.selected_file:
+            preview_title = os.path.basename(self.selected_file)
+        title = Assets.get_font("default-25").render(preview_title, True, "white")
+        self.sub.screen.blit(title, (preview_rect.x + 6, preview_rect.y + 5))
+
+        if self.preview_image is not None:
+            image = self.preview_image
+            is_animation = (
+                self.preview_definition is not None
+                and self.preview_definition.get("type") == "animation"
+            ) or (
+                self.preview_definition is None
+                and self.asset_type == "animation"
+            )
+            if is_animation:
+                options = (
+                    self.preview_definition.get("options", {})
+                    if self.preview_definition
+                    else {}
+                )
+                frame_size = options.get("frame_size", 16)
+                if self.preview_definition is None:
+                    for _, field, key in self.fields:
+                        if key == "frame_size":
+                            try:
+                                frame_size = int(field.text.text)
+                            except ValueError:
+                                frame_size = 16
+                if isinstance(frame_size, int) and frame_size > 0:
+                    columns = image.get_width() // frame_size
+                    rows = image.get_height() // frame_size
+                    frame_count = columns * rows
+                    if frame_count:
+                        fps = options.get("fps", 3)
+                        if self.preview_definition is None:
+                            for _, field, key in self.fields:
+                                if key == "fps":
+                                    try:
+                                        fps = float(field.text.text)
+                                    except ValueError:
+                                        fps = 3
+                        frame_index = int(time.monotonic() * max(1, fps)) % frame_count
+                        frame = pygame.Rect(
+                            (frame_index % columns) * frame_size,
+                            (frame_index // columns) * frame_size,
+                            frame_size,
+                            frame_size,
+                        )
+                        image = image.subsurface(frame)
+
+            available = pygame.Rect(
+                preview_rect.x + 8,
+                preview_rect.y + 32,
+                preview_rect.width - 16,
+                preview_rect.height - 40,
+            )
+            factor = min(
+                available.width / image.get_width(),
+                available.height / image.get_height(),
+            )
+            preview_size = (
+                max(1, int(image.get_width() * factor)),
+                max(1, int(image.get_height() * factor)),
+            )
+            scaled = pygame.transform.smoothscale(image, preview_size)
+            self.sub.screen.blit(scaled, scaled.get_rect(center=available.center))
+        elif self.selected_file and os.path.splitext(self.selected_file)[1].lower() in ASSET_EXTENSIONS["sound"]:
+            audio_label = Assets.get_font("default-25").render("Sound file", True, "white")
+            self.sub.screen.blit(audio_label, audio_label.get_rect(center=preview_rect.center))
+
+        if (
+            self.selected_file
+            and os.path.splitext(self.selected_file)[1].lower()
+            in ASSET_EXTENSIONS["sound"]
+        ):
+            self.preview_play_button.render()
 
         pygame.draw.rect(self.sub.screen, Colors["bg"], (10, 340, 480, self.size.y - 350))
         pygame.draw.rect(self.sub.screen, Colors["bg"], (500, 340, self.size.x - 510, self.size.y - 350))
